@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase-client'
 import type { Member, Stream, ChatMessage, Comment } from '@/lib/database.types'
 import VideoPlayer from './VideoPlayer'
 import ChatPanel from './ChatPanel'
@@ -33,6 +34,22 @@ export default function WatchPageClient({
   const router = useRouter()
   const [floatingEmojis, setFloatingEmojis] = useState<Array<{ id: string; emoji: string; x: number }>>([])
   const [tipBanner, setTipBanner] = useState<{ name: string; amount: number; message?: string } | null>(null)
+
+  // Auto-refresh page when stream goes live or ends
+  useEffect(() => {
+    if (!stream?.id) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`stream-status:${stream.id}`)
+      .on('broadcast', { event: 'stream_live' }, () => {
+        router.refresh()
+      })
+      .on('broadcast', { event: 'stream_ended' }, () => {
+        router.refresh()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [stream?.id, router])
 
   // Show tip success notification
   useEffect(() => {

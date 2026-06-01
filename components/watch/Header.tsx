@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import type { Member, Stream } from '@/lib/database.types'
-import { LogOut, Radio } from 'lucide-react'
+import { LogOut, Radio, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface HeaderProps {
@@ -64,6 +64,16 @@ export default function Header({ member, stream }: HeaderProps) {
             </span>
           )}
         </div>
+        {member.is_moderator && (
+          <a
+            href="/admin"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-white/8"
+            title="Admin panel"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Admin</span>
+          </a>
+        )}
         <Button
           variant="ghost"
           size="sm"
