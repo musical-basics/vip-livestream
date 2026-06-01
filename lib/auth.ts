@@ -17,7 +17,10 @@ export async function getSession(): Promise<Member | null> {
     .eq('is_banned', false)
     .single()
 
-  if (error || !data) return null
+  if (error) {
+    console.error('❌ getSession Supabase error:', error)
+  }
+  if (!data) return null
   return data
 }
 
@@ -46,6 +49,12 @@ export async function validatePasswordToken(token: string): Promise<Member | nul
     .eq('is_banned', false)
     .single()
 
-  if (error || !data) return null
+  if (error) {
+    console.error('❌ validatePasswordToken Supabase error:', error)
+  }
+  if (!data) {
+    console.warn('⚠️ validatePasswordToken: No member found for token:', token)
+    return null
+  }
   return data
 }
