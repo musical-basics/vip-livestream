@@ -8,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns'
 
 interface CommentSectionProps {
   member: Member
-  stream: Stream
+  stream: Stream | null
   initialComments: Comment[]
 }
 
@@ -59,42 +59,51 @@ export default function CommentSection({ member, stream, initialComments }: Comm
         >
           Leave a Note
         </h3>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Share your thoughts, feelings, or a message for the performer…"
-            rows={4}
-            maxLength={1000}
-            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm resize-none focus:outline-none focus:border-[oklch(0.75_0.12_85)] focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] transition-colors placeholder:text-muted-foreground/40 leading-relaxed"
-          />
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground/50">{content.length}/1000</span>
-            <Button
-              type="submit"
-              disabled={isSending || !content.trim()}
-              size="sm"
-              className="rounded-xl px-4 flex items-center gap-2"
-              style={{
-                background: content.trim()
-                  ? 'linear-gradient(135deg, oklch(0.75 0.12 85), oklch(0.60 0.10 70))'
-                  : undefined,
-                color: content.trim() ? 'oklch(0.09 0.015 270)' : undefined,
-              }}
-            >
-              {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              Post Note
-            </Button>
-          </div>
-          {success && (
-            <p className="text-xs text-[oklch(0.72_0.14_160)]">
-              ✓ Your note has been posted!
+        {!stream ? (
+          <div className="flex flex-col items-center py-6 text-center gap-2">
+            <span className="text-3xl">🎹</span>
+            <p className="text-sm text-muted-foreground">
+              Notes will be available once the performance begins.
             </p>
-          )}
-          {error && (
-            <p className="text-xs text-destructive">{error}</p>
-          )}
-        </form>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Share your thoughts, feelings, or a message for the performer…"
+              rows={4}
+              maxLength={1000}
+              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm resize-none focus:outline-none focus:border-[oklch(0.75_0.12_85)] focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] transition-colors placeholder:text-muted-foreground/40 leading-relaxed"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground/50">{content.length}/1000</span>
+              <Button
+                type="submit"
+                disabled={isSending || !content.trim()}
+                size="sm"
+                className="rounded-xl px-4 flex items-center gap-2"
+                style={{
+                  background: content.trim()
+                    ? 'linear-gradient(135deg, oklch(0.75 0.12 85), oklch(0.60 0.10 70))'
+                    : undefined,
+                  color: content.trim() ? 'oklch(0.09 0.015 270)' : undefined,
+                }}
+              >
+                {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                Post Note
+              </Button>
+            </div>
+            {success && (
+              <p className="text-xs text-[oklch(0.72_0.14_160)]">
+                ✓ Your note has been posted!
+              </p>
+            )}
+            {error && (
+              <p className="text-xs text-destructive">{error}</p>
+            )}
+          </form>
+        )}
       </div>
 
       {/* Comments list */}
