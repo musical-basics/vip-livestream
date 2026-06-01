@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export interface Database {
-  public: {
+  vip_livestream: {
     Tables: {
       members: {
         Row: {
@@ -197,12 +197,12 @@ export interface Database {
   }
 }
 
-export type Member = Database['public']['Tables']['members']['Row']
-export type Stream = Database['public']['Tables']['streams']['Row']
-export type ChatMessage = Database['public']['Tables']['chat_messages']['Row']
-export type MemberTimeout = Database['public']['Tables']['member_timeouts']['Row']
-export type Comment = Database['public']['Tables']['comments']['Row']
-export type Tip = Database['public']['Tables']['tips']['Row']
+export type Member = Database['vip_livestream']['Tables']['members']['Row']
+export type Stream = Database['vip_livestream']['Tables']['streams']['Row']
+export type ChatMessage = Database['vip_livestream']['Tables']['chat_messages']['Row']
+export type MemberTimeout = Database['vip_livestream']['Tables']['member_timeouts']['Row']
+export type Comment = Database['vip_livestream']['Tables']['comments']['Row']
+export type Tip = Database['vip_livestream']['Tables']['tips']['Row']
 
 export interface SetlistItem {
   id: string

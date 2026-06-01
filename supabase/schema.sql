@@ -3,8 +3,19 @@
 -- Run this in the Supabase SQL Editor
 -- ============================================================
 
+-- Create schema if not exists
+CREATE SCHEMA IF NOT EXISTS vip_livestream;
+
+-- Grant schema-level permissions
+GRANT USAGE ON SCHEMA vip_livestream TO anon, authenticated, service_role;
+
+-- Alter default privileges for future tables/sequences/functions
+ALTER DEFAULT PRIVILEGES IN SCHEMA vip_livestream GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA vip_livestream GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA vip_livestream GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+
 -- 1. Members table
-CREATE TABLE IF NOT EXISTS public.members (
+CREATE TABLE IF NOT EXISTS vip_livestream.members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   email text UNIQUE NOT NULL,
@@ -16,7 +27,7 @@ CREATE TABLE IF NOT EXISTS public.members (
 );
 
 -- 2. Streams table
-CREATE TABLE IF NOT EXISTS public.streams (
+CREATE TABLE IF NOT EXISTS vip_livestream.streams (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
   youtube_video_id text NOT NULL,
@@ -28,10 +39,10 @@ CREATE TABLE IF NOT EXISTS public.streams (
 );
 
 -- 3. Chat messages table
-CREATE TABLE IF NOT EXISTS public.chat_messages (
+CREATE TABLE IF NOT EXISTS vip_livestream.chat_messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stream_id uuid NOT NULL REFERENCES public.streams(id) ON DELETE CASCADE,
-  member_id uuid NOT NULL REFERENCES public.members(id) ON DELETE CASCADE,
+  stream_id uuid NOT NULL REFERENCES vip_livestream.streams(id) ON DELETE CASCADE,
+  member_id uuid NOT NULL REFERENCES vip_livestream.members(id) ON DELETE CASCADE,
   display_name text NOT NULL,
   content text,
   emoji text,
@@ -40,38 +51,38 @@ CREATE TABLE IF NOT EXISTS public.chat_messages (
   CONSTRAINT content_or_emoji CHECK (content IS NOT NULL OR emoji IS NOT NULL)
 );
 
-CREATE INDEX IF NOT EXISTS idx_chat_messages_stream_id_created ON public.chat_messages(stream_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_stream_id_created ON vip_livestream.chat_messages(stream_id, created_at DESC);
 
 -- 4. Member timeouts table
-CREATE TABLE IF NOT EXISTS public.member_timeouts (
+CREATE TABLE IF NOT EXISTS vip_livestream.member_timeouts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  member_id uuid NOT NULL REFERENCES public.members(id) ON DELETE CASCADE,
-  stream_id uuid NOT NULL REFERENCES public.streams(id) ON DELETE CASCADE,
-  muted_by uuid NOT NULL REFERENCES public.members(id),
+  member_id uuid NOT NULL REFERENCES vip_livestream.members(id) ON DELETE CASCADE,
+  stream_id uuid NOT NULL REFERENCES vip_livestream.streams(id) ON DELETE CASCADE,
+  muted_by uuid NOT NULL REFERENCES vip_livestream.members(id),
   timeout_until timestamptz, -- NULL = permanent
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_member_timeouts_member ON public.member_timeouts(member_id, stream_id);
+CREATE INDEX IF NOT EXISTS idx_member_timeouts_member ON vip_livestream.member_timeouts(member_id, stream_id);
 
 -- 5. Comments table (guestbook / leave-a-note)
-CREATE TABLE IF NOT EXISTS public.comments (
+CREATE TABLE IF NOT EXISTS vip_livestream.comments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stream_id uuid NOT NULL REFERENCES public.streams(id) ON DELETE CASCADE,
-  member_id uuid NOT NULL REFERENCES public.members(id) ON DELETE CASCADE,
+  stream_id uuid NOT NULL REFERENCES vip_livestream.streams(id) ON DELETE CASCADE,
+  member_id uuid NOT NULL REFERENCES vip_livestream.members(id) ON DELETE CASCADE,
   display_name text NOT NULL,
   content text NOT NULL,
   is_approved boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_comments_stream ON public.comments(stream_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_comments_stream ON vip_livestream.comments(stream_id, created_at);
 
 -- 6. Tips table
-CREATE TABLE IF NOT EXISTS public.tips (
+CREATE TABLE IF NOT EXISTS vip_livestream.tips (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stream_id uuid NOT NULL REFERENCES public.streams(id) ON DELETE CASCADE,
-  member_id uuid NOT NULL REFERENCES public.members(id) ON DELETE CASCADE,
+  stream_id uuid NOT NULL REFERENCES vip_livestream.streams(id) ON DELETE CASCADE,
+  member_id uuid NOT NULL REFERENCES vip_livestream.members(id) ON DELETE CASCADE,
   amount_cents integer NOT NULL CHECK (amount_cents > 0),
   stripe_session_id text UNIQUE,
   message text,
@@ -83,47 +94,50 @@ CREATE TABLE IF NOT EXISTS public.tips (
 -- ============================================================
 
 -- Enable RLS on all tables
-ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.streams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.member_timeouts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vip_livestream.members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vip_livestream.streams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vip_livestream.chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vip_livestream.member_timeouts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vip_livestream.comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vip_livestream.tips ENABLE ROW LEVEL SECURITY;
+
+-- Grant all permissions on existing tables (just in case they already existed)
+GRANT ALL ON ALL TABLES IN SCHEMA vip_livestream TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA vip_livestream TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA vip_livestream TO anon, authenticated, service_role;
 
 -- Members: only service role can read/write (all API calls use service role)
 -- Realtime subscriptions use anon key but we use Broadcast (not DB changes) for chat
 -- so no anon policies needed for members table
 
--- Chat messages: allow anon read of non-muted messages for Realtime
--- (Realtime Broadcast doesn't use DB, so these policies are for direct queries)
-CREATE POLICY "Service role full access on members" ON public.members
+CREATE POLICY "Service role full access on members" ON vip_livestream.members
   FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Service role full access on streams" ON public.streams
+CREATE POLICY "Service role full access on streams" ON vip_livestream.streams
   FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Service role full access on chat_messages" ON public.chat_messages
+CREATE POLICY "Service role full access on chat_messages" ON vip_livestream.chat_messages
   FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Service role full access on member_timeouts" ON public.member_timeouts
+CREATE POLICY "Service role full access on member_timeouts" ON vip_livestream.member_timeouts
   FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Service role full access on comments" ON public.comments
+CREATE POLICY "Service role full access on comments" ON vip_livestream.comments
   FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Service role full access on tips" ON public.tips
+CREATE POLICY "Service role full access on tips" ON vip_livestream.tips
   FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
--- Enable Realtime for Broadcast
+-- Enable Realtime for Broadcast/Replication
 -- ============================================================
--- In Supabase dashboard: Database > Replication > enable for chat_messages
+-- In Supabase dashboard: Database > Replication > enable for chat_messages & streams
 -- Or run:
-ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.streams;
+ALTER PUBLICATION supabase_realtime ADD TABLE vip_livestream.chat_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE vip_livestream.streams;
 
 -- ============================================================
 -- Example: Insert a test stream
 -- ============================================================
--- INSERT INTO public.streams (title, youtube_video_id, is_live, description)
+-- INSERT INTO vip_livestream.streams (title, youtube_video_id, is_live, description)
 -- VALUES ('VIP Piano Recital — June 2026', 'YOUR_YOUTUBE_VIDEO_ID', false, 'An intimate evening of classical piano.');

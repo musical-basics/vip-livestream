@@ -36,6 +36,7 @@ async function main() {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
+    db: { schema: 'vip_livestream' },
   })
 
   console.log(`\n🎹 Seeding ${MEMBERS.length} members...\n`)
