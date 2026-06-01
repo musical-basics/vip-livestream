@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase-server'
 import WatchPageClient from '@/components/watch/WatchPageClient'
-import type { Stream, SetlistItem } from '@/lib/database.types'
+import type { Stream } from '@/lib/database.types'
 
 export default async function WatchPage() {
   const member = await getSession()
@@ -10,55 +10,63 @@ export default async function WatchPage() {
 
   const supabase = createServiceClient()
 
-  // Get the most recent stream (live or not)
-  const { data: stream } = await supabase
+  // Get the most recent stream. maybeSingle() returns null (no error) when no rows exist.
+  const { data: existingStream } = await supabase
     .from('streams')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
-  // Get initial chat messages (last 50)
-  const { data: initialMessages } = stream
-    ? await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('stream_id', stream.id)
-        .eq('is_muted', false)
-        .order('created_at', { ascending: false })
-        .limit(50)
-    : { data: [] }
+  // Auto-provision a default stream if none exists yet.
+  // This ensures chat, comments, and the watch page work immediately on first visit.
+  const stream: Stream | null = existingStream ?? (
+    await supabase
+      .from('streams')
+      .insert({
+        title: 'VIP Piano Livestream',
+        youtube_video_id: '',
+        is_live: false,
+        description: '',
+      })
+      .select()
+      .single()
+  ).data
 
-  // Get comments
-  const { data: initialComments } = stream
-    ? await supabase
-        .from('comments')
-        .select('*')
-        .eq('stream_id', stream.id)
-        .eq('is_approved', true)
-        .order('created_at', { ascending: true })
-    : { data: [] }
-
-  // Get active timeouts for this member
-  const { data: myTimeout } = stream
-    ? await supabase
-        .from('member_timeouts')
-        .select('*')
-        .eq('member_id', member.id)
-        .eq('stream_id', stream.id)
-        .or(`timeout_until.is.null,timeout_until.gt.${new Date().toISOString()}`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-    : { data: null }
+  // Fetch all stream-dependent data in parallel once we have a stream
+  const [messagesRes, commentsRes, timeoutRes] = stream
+    ? await Promise.all([
+        supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('stream_id', stream.id)
+          .eq('is_muted', false)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('comments')
+          .select('*')
+          .eq('stream_id', stream.id)
+          .eq('is_approved', true)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('member_timeouts')
+          .select('id')
+          .eq('member_id', member.id)
+          .eq('stream_id', stream.id)
+          .or(`timeout_until.is.null,timeout_until.gt.${new Date().toISOString()}`)
+          .limit(1)
+          .maybeSingle(),
+      ])
+    : [{ data: [] }, { data: [] }, { data: null }]
 
   return (
     <WatchPageClient
       member={member}
-      stream={stream as Stream | null}
-      initialMessages={(initialMessages || []).reverse()}
-      initialComments={initialComments || []}
-      isMuted={!!myTimeout}
+      stream={stream}
+      initialMessages={((messagesRes.data as any[]) || []).reverse()}
+      initialComments={(commentsRes.data as any[]) || []}
+      isMuted={!!timeoutRes.data}
     />
   )
 }

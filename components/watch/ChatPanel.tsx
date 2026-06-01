@@ -247,10 +247,6 @@ export default function ChatPanel({
               🔇 You are currently muted by a moderator
             </p>
           </div>
-        ) : !stream?.is_live && !stream ? (
-          <div className="text-center py-3">
-            <p className="text-xs text-muted-foreground">Chat opens when the stream begins</p>
-          </div>
         ) : (
           <div className="flex items-end gap-2">
             <textarea
