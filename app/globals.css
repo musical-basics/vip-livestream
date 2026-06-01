@@ -1,26 +1,236 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter), 'Inter', sans-serif;
+  --font-heading: var(--font-cormorant), 'Cormorant Garamond', serif;
   --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-gold: var(--gold);
+  --color-gold-muted: var(--gold-muted);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* Force dark mode — this is a dark-only experience */
+  color-scheme: dark;
+
+  --background: oklch(0.09 0.015 270);
+  --foreground: oklch(0.93 0.01 80);
+  --card: oklch(0.12 0.015 270);
+  --card-foreground: oklch(0.93 0.01 80);
+  --popover: oklch(0.13 0.015 270);
+  --popover-foreground: oklch(0.93 0.01 80);
+  --primary: oklch(0.75 0.12 85);
+  --primary-foreground: oklch(0.09 0.015 270);
+  --secondary: oklch(0.16 0.015 270);
+  --secondary-foreground: oklch(0.85 0.01 80);
+  --muted: oklch(0.15 0.012 270);
+  --muted-foreground: oklch(0.55 0.01 80);
+  --accent: oklch(0.75 0.12 85);
+  --accent-foreground: oklch(0.09 0.015 270);
+  --destructive: oklch(0.65 0.22 25);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.75 0.12 85);
+  --radius: 0.75rem;
+  --gold: oklch(0.75 0.12 85);
+  --gold-muted: oklch(0.65 0.09 85);
+  --surface: oklch(0.12 0.015 270);
+  --surface-2: oklch(0.15 0.015 270);
+  --chart-1: oklch(0.75 0.12 85);
+  --chart-2: oklch(0.6 0.12 200);
+  --chart-3: oklch(0.7 0.1 320);
+  --chart-4: oklch(0.65 0.08 150);
+  --chart-5: oklch(0.5 0.08 270);
+  --sidebar: oklch(0.10 0.015 270);
+  --sidebar-foreground: oklch(0.93 0.01 80);
+  --sidebar-primary: oklch(0.75 0.12 85);
+  --sidebar-primary-foreground: oklch(0.09 0.015 270);
+  --sidebar-accent: oklch(0.16 0.015 270);
+  --sidebar-accent-foreground: oklch(0.85 0.01 80);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.75 0.12 85);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image: 
+      radial-gradient(ellipse at 20% 0%, oklch(0.18 0.04 270 / 0.4) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, oklch(0.15 0.03 85 / 0.2) 0%, transparent 50%);
+    min-height: 100vh;
+  }
+  html {
+    font-family: 'Inter', sans-serif;
+  }
+  h1, h2, h3, .font-heading {
+    font-family: 'Cormorant Garamond', serif;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.3 0.02 270);
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.75 0.12 85 / 0.5);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Glass morphism utility */
+.glass {
+  background: oklch(0.12 0.015 270 / 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid oklch(1 0 0 / 8%);
+}
+
+.glass-heavy {
+  background: oklch(0.10 0.015 270 / 0.85);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid oklch(1 0 0 / 10%);
+}
+
+/* Gold text gradient */
+.text-gold {
+  background: linear-gradient(135deg, oklch(0.82 0.14 85), oklch(0.68 0.10 70));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Floating emoji animation */
+@keyframes floatUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  70% {
+    opacity: 0.8;
+    transform: translateY(-80px) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-140px) scale(0.9);
+  }
+}
+
+.emoji-float {
+  animation: floatUp 2.5s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Chat message fade in */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-appear {
+  animation: slideInUp 0.2s ease-out;
+}
+
+/* Glow pulse for live indicator */
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 4px 0 oklch(0.65 0.22 25 / 0.8);
+  }
+  50% {
+    box-shadow: 0 0 12px 4px oklch(0.65 0.22 25 / 0.6);
+  }
+}
+
+.live-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Tip banner animation */
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tip-banner {
+  animation: slideInDown 0.4s ease-out;
+}
+
+/* Shimmer for loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.15 0.01 270) 0%,
+    oklch(0.22 0.02 270) 50%,
+    oklch(0.15 0.01 270) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }

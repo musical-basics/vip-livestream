@@ -1,65 +1,84 @@
-import Image from "next/image";
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth'
+import { autoLoginAction } from './actions'
+import LoginForm from '@/components/LoginForm'
 
-export default function Home() {
+interface PageProps {
+  searchParams: Promise<{ password?: string }>
+}
+
+export default async function HomePage({ searchParams }: PageProps) {
+  const params = await searchParams
+
+  // Auto-login via ?password= token
+  if (params.password) {
+    const member = await autoLoginAction(params.password)
+    if (member) {
+      redirect('/watch')
+    }
+    // Invalid token — fall through to show login form with error
+  }
+
+  // Already logged in
+  const session = await getSession()
+  if (session) {
+    redirect('/watch')
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen flex items-center justify-center p-4">
+      {/* Background piano keys subtle illustration */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-32 opacity-5">
+          {Array.from({ length: 24 }).map((_, i) => (
+            <div
+              key={i}
+              className="inline-block h-full border-r border-white/20"
+              style={{
+                width: `${100 / 24}%`,
+                background: [1, 3, 6, 8, 10, 13, 15, 18, 20, 22].includes(i % 12)
+                  ? 'oklch(0.15 0.01 270)'
+                  : 'oklch(0.5 0.01 270)',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="relative w-full max-w-md">
+        {/* Logo / branding */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[oklch(0.75_0.12_85)] to-[oklch(0.55_0.10_70)] flex items-center justify-center">
+              <span className="text-sm">🎹</span>
+            </div>
+            <span className="text-sm font-medium tracking-widest uppercase text-muted-foreground">
+              Musical Basics
+            </span>
+          </div>
+          <h1
+            className="text-5xl font-light text-gold mb-3"
+            style={{ fontFamily: "'Cormorant Garamond', serif" }}
+          >
+            VIP Livestream
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            An intimate piano performance, exclusively for you.
+            <br />
+            Enter your personal access password below.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Login card */}
+        <div className="glass rounded-2xl p-8 shadow-2xl">
+          <LoginForm invalidToken={!!params.password} />
         </div>
-      </main>
-    </div>
-  );
+
+        {/* Footer */}
+        <p className="text-center text-xs text-muted-foreground mt-6 opacity-50">
+          Access is by invitation only. If you need help, contact your host.
+        </p>
+      </div>
+    </main>
+  )
 }
