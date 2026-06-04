@@ -30,6 +30,7 @@ interface WatchPageClientProps {
   stream: Stream | null
   initialMessages: ChatMessage[]
   initialComments: Comment[]
+  memberDirectory: Member[]
   isMuted: boolean
 }
 
@@ -90,6 +91,7 @@ export default function WatchPageClient({
   stream,
   initialMessages,
   initialComments,
+  memberDirectory,
   isMuted,
 }: WatchPageClientProps) {
   const searchParams = useSearchParams()
@@ -298,6 +300,7 @@ export default function WatchPageClient({
             member={member}
             stream={stream}
             initialMessages={initialMessages}
+            memberDirectory={memberDirectory}
             isMuted={isMuted}
             onEmojiReaction={addFloatingEmoji}
             onTipBanner={setTipBanner}

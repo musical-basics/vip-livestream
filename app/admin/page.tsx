@@ -17,7 +17,7 @@ export default async function AdminPage() {
 
   const { data: members } = await supabase
     .from('members')
-    .select('id, name, email, display_name, is_moderator, is_banned, created_at')
+    .select('*')
     .order('name')
 
   return (

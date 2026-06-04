@@ -60,6 +60,10 @@ export type ProvisionResult =
   | { status: 'exists'; email: string; password_token: string }
   | { status: 'skipped'; reason: string }
 
+function isMissingAccessBadgesColumn(error: { code?: string; message?: string }) {
+  return error.code === 'PGRST204' || error.message?.includes('access_badges')
+}
+
 /**
  * Idempotently provision a member from a livestream order. If a member with the
  * same email already exists, their assigned password is preserved, so already
@@ -85,11 +89,29 @@ export async function provisionLivestreamMember(order: ShopifyOrder): Promise<Pr
   }
 
   const password_token = randomUUID()
-  const { data, error } = await supabase
+  const insertPayload = {
+    name,
+    email,
+    password_token,
+    access_badges: ['dreamplay_buyer'],
+    display_name: name,
+    is_moderator: false,
+  }
+  let { data, error } = await supabase
     .from('members')
-    .insert({ name, email, password_token, display_name: name, is_moderator: false })
+    .insert(insertPayload)
     .select('email,password_token')
     .single()
+  if (error && isMissingAccessBadgesColumn(error)) {
+    const { access_badges: _accessBadges, ...legacyPayload } = insertPayload
+    const retry = await supabase
+      .from('members')
+      .insert(legacyPayload)
+      .select('email,password_token')
+      .single()
+    data = retry.data
+    error = retry.error
+  }
   if (error) {
     // Lost an insert race (unique email) — treat as already provisioned.
     if (error.code === '23505') {

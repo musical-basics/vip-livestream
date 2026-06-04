@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import type { Member, ChatMessage } from '@/lib/database.types'
+import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { formatDistanceToNow } from 'date-fns'
-import { MoreHorizontal, VolumeX, Clock } from 'lucide-react'
+import { MoreHorizontal, Trash2, Clock } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -13,8 +14,11 @@ import {
 interface ChatMessageRowProps {
   message: ChatMessage
   currentMember: Member
+  senderBadges?: string[]
+  senderIsModerator: boolean
   isMuted: boolean
   streamId: string | undefined
+  onDeleted: (messageId: string) => void
 }
 
 const TIMEOUT_OPTIONS = [
@@ -40,20 +44,33 @@ function getMemberColor(memberId: string): string {
 export default function ChatMessageRow({
   message,
   currentMember,
+  senderBadges,
+  senderIsModerator,
   isMuted,
   streamId,
+  onDeleted,
 }: ChatMessageRowProps) {
-  const [showMod, setShowMod] = useState(false)
+  const [modMenuPosition, setModMenuPosition] = useState<{ x: number; y: number } | null>(null)
   const [isActing, setIsActing] = useState(false)
 
   const isMod = currentMember.is_moderator
   const isOwn = message.member_id === currentMember.id
   const color = getMemberColor(message.member_id)
+  const visibleBadges = normalizeMemberBadges(senderBadges)
+
+  function openModMenu(e: React.MouseEvent) {
+    if (!isMod) return
+    e.preventDefault()
+    setModMenuPosition({
+      x: Math.min(e.clientX, window.innerWidth - 190),
+      y: Math.min(e.clientY, window.innerHeight - 260),
+    })
+  }
 
   async function handleTimeout(minutes: number | null) {
     if (!streamId) return
     setIsActing(true)
-    setShowMod(false)
+    setModMenuPosition(null)
     try {
       await fetch('/api/mod/timeout', {
         method: 'POST',
@@ -72,26 +89,56 @@ export default function ChatMessageRow({
   async function handleMuteMessage() {
     if (!streamId) return
     setIsActing(true)
-    setShowMod(false)
+    setModMenuPosition(null)
     try {
-      await fetch('/api/mod/mute-message', {
-        method: 'POST',
+      const res = await fetch('/api/mod/delete-message', {
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message_id: message.id,
           stream_id: streamId,
         }),
       })
+      if (res.ok) onDeleted(message.id)
     } finally {
       setIsActing(false)
     }
+  }
+
+  function renderSenderBadges() {
+    return (
+      <>
+        {senderIsModerator && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded border border-[oklch(0.75_0.12_85)/35] text-[oklch(0.78_0.13_85)] bg-[oklch(0.75_0.12_85)/10] tracking-wide">
+            MOD
+          </span>
+        )}
+        {visibleBadges.map((badgeId) => {
+          const badge = getMemberBadge(badgeId)
+          if (!badge) return null
+          return (
+            <span
+              key={badge.id}
+              className={`text-[9px] px-1.5 py-0.5 rounded border ${badge.className}`}
+              title={badge.label}
+            >
+              <span className="mr-1">{badge.emoji}</span>
+              {badge.label}
+            </span>
+          )
+        })}
+      </>
+    )
   }
 
   if (isMuted) {
     // Moderators see muted messages greyed out; others see nothing
     if (!isMod) return null
     return (
-      <div className="message-appear flex gap-2 px-2 py-1 rounded-lg opacity-30">
+      <div
+        onContextMenu={openModMenu}
+        className="message-appear flex gap-2 px-2 py-1 rounded-lg opacity-30"
+      >
         <span className="text-xs" style={{ color }}>
           {message.display_name}
         </span>
@@ -99,6 +146,15 @@ export default function ChatMessageRow({
           {message.content || message.emoji}
         </span>
         <span className="text-[10px] text-muted-foreground ml-auto">[muted]</span>
+        {modMenuPosition && isMod && (
+          <ModMenu
+            position={modMenuPosition}
+            isOwn={isOwn}
+            isActing={isActing}
+            onDelete={handleMuteMessage}
+            onTimeout={handleTimeout}
+          />
+        )}
       </div>
     )
   }
@@ -106,26 +162,50 @@ export default function ChatMessageRow({
   // Emoji-only message
   if (!message.content && message.emoji) {
     return (
-      <div className="message-appear flex items-center gap-1.5 px-2 py-0.5">
+      <div
+        onContextMenu={openModMenu}
+        className="message-appear flex items-center gap-1.5 px-2 py-0.5"
+      >
         <span className="text-xs font-medium" style={{ color }}>
           {message.display_name}
         </span>
+        {renderSenderBadges()}
         <span className="text-lg">{message.emoji}</span>
+        {modMenuPosition && isMod && (
+          <ModMenu
+            position={modMenuPosition}
+            isOwn={isOwn}
+            isActing={isActing}
+            onDelete={handleMuteMessage}
+            onTimeout={handleTimeout}
+          />
+        )}
       </div>
     )
   }
 
   return (
     <div
+      onContextMenu={openModMenu}
       className="message-appear group relative flex flex-col gap-0.5 px-2 py-1 rounded-lg hover:bg-white/3 transition-colors"
     >
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold" style={{ color }}>
           {message.display_name}
         </span>
-        {isMod && isOwn === false && (
+        {renderSenderBadges()}
+        {isMod && (
           <button
-            onClick={() => setShowMod((v) => !v)}
+            onClick={(e) =>
+              setModMenuPosition((position) =>
+                position
+                  ? null
+                  : {
+                      x: Math.min(e.clientX, window.innerWidth - 190),
+                      y: Math.min(e.clientY, window.innerHeight - 260),
+                    }
+              )
+            }
             className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
           >
             <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
@@ -148,24 +228,55 @@ export default function ChatMessageRow({
       </p>
 
       {/* Moderator dropdown */}
-      {showMod && isMod && (
-        <div className="absolute right-0 top-full mt-1 z-50 glass rounded-xl shadow-xl p-1 min-w-[160px] border border-white/10">
-          <p className="text-[10px] text-muted-foreground px-2 py-1 tracking-widest uppercase">
-            Mod Actions
-          </p>
-          <button
-            onClick={handleMuteMessage}
-            disabled={isActing}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 rounded-lg transition-colors text-left"
-          >
-            <VolumeX className="w-3 h-3" />
-            Delete this message
-          </button>
+      {modMenuPosition && isMod && (
+        <ModMenu
+          position={modMenuPosition}
+          isOwn={isOwn}
+          isActing={isActing}
+          onDelete={handleMuteMessage}
+          onTimeout={handleTimeout}
+        />
+      )}
+    </div>
+  )
+}
+
+function ModMenu({
+  position,
+  isOwn,
+  isActing,
+  onDelete,
+  onTimeout,
+}: {
+  position: { x: number; y: number }
+  isOwn: boolean
+  isActing: boolean
+  onDelete: () => void
+  onTimeout: (minutes: number | null) => void
+}) {
+  return (
+    <div
+      className="fixed z-50 glass rounded-xl shadow-xl p-1 min-w-[178px] border border-white/10"
+      style={{ left: position.x, top: position.y }}
+    >
+      <p className="text-[10px] text-muted-foreground px-2 py-1 tracking-widest uppercase">
+        Mod Actions
+      </p>
+      <button
+        onClick={onDelete}
+        disabled={isActing}
+        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-destructive/15 rounded-lg transition-colors text-left text-destructive/90"
+      >
+        <Trash2 className="w-3 h-3" />
+        Delete chat
+      </button>
+      {!isOwn && (
+        <>
           <div className="my-1 border-t border-white/10" />
           {TIMEOUT_OPTIONS.map((opt) => (
             <button
               key={opt.label}
-              onClick={() => handleTimeout(opt.minutes)}
+              onClick={() => onTimeout(opt.minutes)}
               disabled={isActing}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-destructive/20 rounded-lg transition-colors text-left text-destructive/80"
             >
@@ -173,7 +284,7 @@ export default function ChatMessageRow({
               Timeout {opt.label}
             </button>
           ))}
-        </div>
+        </>
       )}
     </div>
   )

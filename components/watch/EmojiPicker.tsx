@@ -13,6 +13,8 @@ interface EmojiPickerProps {
   onClose: () => void
 }
 
+type EmojiSelection = { native: string }
+
 export default function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -53,7 +55,7 @@ export default function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
       <div className="emoji-picker-container overflow-hidden">
         <Picker
           data={data}
-          onEmojiSelect={(e: any) => onSelect(e.native)}
+          onEmojiSelect={(e: EmojiSelection) => onSelect(e.native)}
           theme="dark"
           set="native"
           previewPosition="none"

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import type { Member, Stream } from '@/lib/database.types'
+import { MEMBER_BADGES, getMemberBadge, normalizeMemberBadges, type MemberBadgeId } from '@/lib/member-badges'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -23,7 +23,6 @@ import {
   Loader2,
   Settings,
   ArrowLeft,
-  Trash2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
@@ -35,7 +34,6 @@ interface AdminPageClientProps {
 }
 
 export default function AdminPageClient({ currentMember, streams, members }: AdminPageClientProps) {
-  const router = useRouter()
   const [streamList, setStreamList] = useState<Stream[]>(streams)
   const [memberList, setMemberList] = useState<Member[]>(members)
   const [isCreating, setIsCreating] = useState(false)
@@ -135,6 +133,27 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     if (res.ok) {
       setMemberList((prev) =>
         prev.map((m) => (m.id === member.id ? { ...m, is_banned: !m.is_banned } : m))
+      )
+    }
+    setLoadingId(null)
+  }
+
+  async function toggleBadge(member: Member, badgeId: MemberBadgeId) {
+    const currentBadges = normalizeMemberBadges(member.access_badges)
+    const nextBadges = currentBadges.includes(badgeId)
+      ? currentBadges.filter((badge) => badge !== badgeId)
+      : [...currentBadges, badgeId]
+
+    setLoadingId(member.id)
+    const res = await fetch('/api/admin/member', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id: member.id, access_badges: nextBadges }),
+    })
+    if (res.ok) {
+      const { member: updatedMember } = await res.json()
+      setMemberList((prev) =>
+        prev.map((m) => (m.id === member.id ? { ...m, access_badges: updatedMember.access_badges } : m))
       )
     }
     setLoadingId(null)
@@ -361,7 +380,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
           {/* ── MEMBERS TAB ── */}
           <TabsContent value="members" className="space-y-3">
             <p className="text-xs text-muted-foreground mb-4">
-              Manage member access, moderator status, and bans. Use the seed script to add new members.
+              Manage member badges, moderator status, and bans. Use the seed script or agent API to add new members.
             </p>
             {memberList.map((m) => (
               <div
@@ -396,12 +415,49 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                       </Badge>
                     )}
                   </div>
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    {normalizeMemberBadges(m.access_badges).map((badgeId) => {
+                      const badge = getMemberBadge(badgeId)
+                      if (!badge) return null
+                      return (
+                        <Badge
+                          key={badge.id}
+                          variant="outline"
+                          className={`text-[10px] ${badge.className}`}
+                        >
+                          <span className="mr-1">{badge.emoji}</span>
+                          {badge.label}
+                        </Badge>
+                      )
+                    })}
+                  </div>
                   <p className="text-xs text-muted-foreground truncate">{m.email}</p>
                 </div>
 
                 {/* Actions */}
-                {m.id !== currentMember.id && (
-                  <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
+                  <div className="flex items-center gap-1 rounded-xl border border-white/8 bg-white/5 p-1">
+                    {MEMBER_BADGES.map((badge) => {
+                      const isSelected = normalizeMemberBadges(m.access_badges).includes(badge.id)
+                      return (
+                        <button
+                          key={badge.id}
+                          onClick={() => toggleBadge(m, badge.id)}
+                          disabled={loadingId === m.id}
+                          title={badge.label}
+                          className={`px-2 py-1 rounded-lg text-xs transition-colors ${
+                            isSelected
+                              ? `${badge.className} border`
+                              : 'text-muted-foreground hover:text-foreground hover:bg-white/10'
+                          }`}
+                        >
+                          {badge.emoji}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {m.id !== currentMember.id && (
+                    <div className="flex items-center gap-2">
                     <button
                       onClick={() => toggleModerator(m)}
                       disabled={loadingId === m.id}
@@ -429,7 +485,8 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                       )}
                     </button>
                   </div>
-                )}
+                  )}
+                </div>
               </div>
             ))}
           </TabsContent>

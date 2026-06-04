@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { normalizeMemberBadges } from '@/lib/member-badges'
 import { createServiceClient } from '@/lib/supabase-server'
 
-// PATCH — update member (toggle moderator, ban)
+// PATCH — update member (badges, moderator, ban)
 export async function PATCH(request: NextRequest) {
   const member = await getSession()
   if (!member?.is_moderator) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { member_id, is_moderator, is_banned } = await request.json()
+  const { member_id, is_moderator, is_banned, access_badges } = await request.json()
   if (!member_id) return NextResponse.json({ error: 'member_id required' }, { status: 400 })
 
   // Protect: cannot modify yourself
@@ -16,15 +17,18 @@ export async function PATCH(request: NextRequest) {
   }
 
   const supabase = createServiceClient()
-  const update: Record<string, any> = {}
+  const update: Record<string, unknown> = {}
   if (is_moderator !== undefined) update.is_moderator = is_moderator
   if (is_banned !== undefined) update.is_banned = is_banned
+  if (access_badges !== undefined) update.access_badges = normalizeMemberBadges(access_badges)
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('members')
     .update(update)
     .eq('id', member_id)
+    .select()
+    .single()
 
   if (error) return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, member: data })
 }

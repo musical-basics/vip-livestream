@@ -15,6 +15,7 @@ export interface Database {
           name: string
           email: string
           password_token: string
+          access_badges: string[]
           display_name: string | null
           is_moderator: boolean
           is_banned: boolean
@@ -25,6 +26,7 @@ export interface Database {
           name: string
           email: string
           password_token: string
+          access_badges?: string[]
           display_name?: string | null
           is_moderator?: boolean
           is_banned?: boolean
@@ -35,6 +37,7 @@ export interface Database {
           name?: string
           email?: string
           password_token?: string
+          access_badges?: string[]
           display_name?: string | null
           is_moderator?: boolean
           is_banned?: boolean

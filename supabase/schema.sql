@@ -21,11 +21,46 @@ CREATE TABLE IF NOT EXISTS vip_livestream.members (
   email text UNIQUE NOT NULL,
   -- Internal name kept for compatibility; this is the assigned password emailed to the member.
   password_token text UNIQUE NOT NULL,
+  access_badges text[] NOT NULL DEFAULT ARRAY['vip_member']::text[],
   display_name text,
   is_moderator boolean NOT NULL DEFAULT false,
   is_banned boolean NOT NULL DEFAULT false,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT members_access_badges_not_empty CHECK (coalesce(array_length(access_badges, 1), 0) > 0),
+  CONSTRAINT members_access_badges_valid CHECK (
+    access_badges <@ ARRAY['vip_member', 'private_student', 'dreamplay_buyer']::text[]
+  )
 );
+
+ALTER TABLE vip_livestream.members
+  ADD COLUMN IF NOT EXISTS access_badges text[] NOT NULL DEFAULT ARRAY['vip_member']::text[];
+
+UPDATE vip_livestream.members
+SET access_badges = ARRAY['vip_member']::text[]
+WHERE coalesce(array_length(access_badges, 1), 0) = 0;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'members_access_badges_not_empty'
+      AND conrelid = 'vip_livestream.members'::regclass
+  ) THEN
+    ALTER TABLE vip_livestream.members
+      ADD CONSTRAINT members_access_badges_not_empty CHECK (coalesce(array_length(access_badges, 1), 0) > 0);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'members_access_badges_valid'
+      AND conrelid = 'vip_livestream.members'::regclass
+  ) THEN
+    ALTER TABLE vip_livestream.members
+      ADD CONSTRAINT members_access_badges_valid CHECK (
+        access_badges <@ ARRAY['vip_member', 'private_student', 'dreamplay_buyer']::text[]
+      );
+  END IF;
+END $$;
 
 -- 2. Streams table
 CREATE TABLE IF NOT EXISTS vip_livestream.streams (
@@ -147,10 +182,14 @@ ALTER PUBLICATION supabase_realtime ADD TABLE vip_livestream.streams;
 -- Login URL: https://vip.musicalbasics.com
 -- Email: test@musicalbasics.com
 -- Assigned password: test
-INSERT INTO vip_livestream.members (name, email, password_token, display_name, is_moderator, is_banned)
-VALUES ('Test Viewer', 'test@musicalbasics.com', 'test', 'Test Viewer', false, false)
+-- Access badges: VIP Member
+-- Moderator: yes, so right-click moderation can be tested
+INSERT INTO vip_livestream.members (name, email, password_token, access_badges, display_name, is_moderator, is_banned)
+VALUES ('Test Viewer', 'test@musicalbasics.com', 'test', ARRAY['vip_member']::text[], 'Test Viewer', true, false)
 ON CONFLICT (email) DO UPDATE SET
   name = EXCLUDED.name,
   password_token = EXCLUDED.password_token,
+  access_badges = EXCLUDED.access_badges,
   display_name = EXCLUDED.display_name,
+  is_moderator = true,
   is_banned = false;

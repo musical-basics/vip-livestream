@@ -16,12 +16,22 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vip.musicalbasics.com'
 
 const MEMBERS = [
-  { name: 'Test Viewer', email: 'test@musicalbasics.com', password: 'test' },
+  {
+    name: 'Test Viewer',
+    email: 'test@musicalbasics.com',
+    password: 'test',
+    access_badges: ['vip_member'],
+    is_moderator: true,
+  },
   // { name: 'Jane Doe', email: 'jane@example.com', is_moderator: false },
   // { name: 'John Smith', email: 'john@example.com', is_moderator: true },
   // Add your members here...
 ]
 // ────────────────────────────────────────────────────────────
+
+function isMissingAccessBadgesColumn(error) {
+  return error?.code === 'PGRST204' || error?.message?.includes('access_badges')
+}
 
 async function main() {
   if (!SUPABASE_URL || !SERVICE_KEY) {
@@ -46,26 +56,46 @@ async function main() {
   for (const member of MEMBERS) {
     const email = member.email.trim().toLowerCase()
     const password = member.password || crypto.randomUUID()
-    const { data, error } = await supabase
+    const payload = {
+      name: member.name,
+      email,
+      password_token: password,
+      access_badges: member.access_badges ?? ['vip_member'],
+      display_name: member.name,
+      is_moderator: member.is_moderator ?? false,
+      is_banned: false,
+    }
+
+    let { data, error } = await supabase
       .from('members')
       .upsert(
-        {
-          name: member.name,
-          email,
-          password_token: password,
-          display_name: member.name,
-          is_moderator: member.is_moderator ?? false,
-          is_banned: false,
-        },
+        payload,
         { onConflict: 'email', ignoreDuplicates: false }
       )
       .select()
       .single()
 
+    if (error && isMissingAccessBadgesColumn(error)) {
+      const { access_badges: _accessBadges, ...legacyPayload } = payload
+      const retry = await supabase
+        .from('members')
+        .upsert(legacyPayload, { onConflict: 'email', ignoreDuplicates: false })
+        .select()
+        .single()
+      data = retry.data
+      error = retry.error
+    }
+
     if (error) {
       console.error(`❌ Failed to add ${member.name} (${email}):`, error.message)
     } else {
-      results.push({ name: member.name, email, password: data.password_token })
+      results.push({
+        name: member.name,
+        email,
+        password: data.password_token,
+        access_badges: data.access_badges ?? payload.access_badges,
+        is_moderator: data.is_moderator,
+      })
       console.log(`✅ ${member.name} (${email})`)
       console.log(`   Login: ${APP_URL}`)
       console.log(`   Password: ${data.password_token}\n`)
@@ -75,10 +105,12 @@ async function main() {
   console.log('\n─────────────────────────────────────')
   console.log('Login credentials ready to email:')
   console.log('─────────────────────────────────────')
-  results.forEach(({ name, email, password }) => {
+  results.forEach(({ name, email, password, access_badges, is_moderator }) => {
     console.log(`${name} <${email}>`)
     console.log(`  Login: ${APP_URL}`)
     console.log(`  Password: ${password}`)
+    console.log(`  Badges: ${access_badges.join(', ')}`)
+    console.log(`  Moderator: ${is_moderator ? 'yes' : 'no'}`)
   })
 }
 

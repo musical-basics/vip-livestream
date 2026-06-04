@@ -78,3 +78,39 @@ export async function PATCH(request: NextRequest) {
 
   return Response.json({ ok: true, message: data })
 }
+
+/**
+ * DELETE /api/agent/messages
+ * Delete a specific chat message.
+ * Body: { message_id, stream_id }
+ */
+export async function DELETE(request: NextRequest) {
+  if (!verifyAgentKey(request)) return agentUnauthorized()
+
+  const { message_id, stream_id } = await request.json()
+  if (!message_id || !stream_id) {
+    return Response.json({ error: 'message_id and stream_id are required' }, { status: 400 })
+  }
+
+  const supabase = createServiceClient()
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .delete()
+    .eq('id', message_id)
+    .eq('stream_id', stream_id)
+    .select('id')
+    .maybeSingle()
+
+  if (error) return Response.json({ error: error.message }, { status: 500 })
+  if (!data) return Response.json({ error: 'Message not found' }, { status: 404 })
+
+  const rt = realtimeClient()
+  const ch = rt.channel(`stream:${stream_id}`)
+  await ch.send({
+    type: 'broadcast',
+    event: 'delete_message',
+    payload: { message_id },
+  })
+
+  return Response.json({ ok: true, deleted: message_id })
+}

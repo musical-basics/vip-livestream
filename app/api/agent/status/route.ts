@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { verifyAgentKey, agentUnauthorized } from '@/lib/agent-auth'
+import { MEMBER_BADGES, normalizeMemberBadges } from '@/lib/member-badges'
 import { createServiceClient } from '@/lib/supabase-server'
 
 /**
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
       .single(),
     supabase
       .from('members')
-      .select('id, name, email, is_moderator, is_banned, created_at'),
+      .select('*'),
     supabase
       .from('chat_messages')
       .select('id', { count: 'exact', head: true }),
@@ -28,6 +29,12 @@ export async function GET(request: NextRequest) {
 
   const stream = streamRes.data
   const members = membersRes.data ?? []
+  const badgeCounts = Object.fromEntries(MEMBER_BADGES.map((badge) => [badge.id, 0]))
+  members.forEach((member) => {
+    normalizeMemberBadges(member.access_badges).forEach((badgeId) => {
+      badgeCounts[badgeId] = (badgeCounts[badgeId] ?? 0) + 1
+    })
+  })
 
   return Response.json({
     ok: true,
@@ -44,6 +51,7 @@ export async function GET(request: NextRequest) {
       total: members.length,
       moderators: members.filter(m => m.is_moderator).length,
       banned: members.filter(m => m.is_banned).length,
+      badges: badgeCounts,
     },
     total_messages: messagesRes.count ?? 0,
     timestamp: new Date().toISOString(),

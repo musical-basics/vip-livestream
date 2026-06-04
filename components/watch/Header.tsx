@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import type { Member, Stream } from '@/lib/database.types'
+import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { LogOut, Radio, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -12,6 +13,7 @@ interface HeaderProps {
 
 export default function Header({ member, stream }: HeaderProps) {
   const router = useRouter()
+  const memberBadges = normalizeMemberBadges(member.access_badges)
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -63,6 +65,20 @@ export default function Header({ member, stream }: HeaderProps) {
               MOD
             </span>
           )}
+          {memberBadges.map((badgeId) => {
+            const badge = getMemberBadge(badgeId)
+            if (!badge) return null
+            return (
+              <span
+                key={badge.id}
+                className={`text-[10px] px-1.5 py-0.5 rounded border ${badge.className}`}
+                title={badge.label}
+              >
+                <span className="mr-1">{badge.emoji}</span>
+                {badge.label}
+              </span>
+            )
+          })}
         </div>
         {member.is_moderator && (
           <a

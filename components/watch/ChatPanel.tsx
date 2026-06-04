@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import type { Member, Stream, ChatMessage } from '@/lib/database.types'
 import ChatMessageRow from './ChatMessageRow'
@@ -16,6 +16,7 @@ interface ChatPanelProps {
   member: Member
   stream: Stream | null
   initialMessages: ChatMessage[]
+  memberDirectory: Member[]
   isMuted: boolean
   onEmojiReaction: (emoji: string) => void
   onTipBanner: (tip: { name: string; amount: number; message?: string }) => void
@@ -25,6 +26,7 @@ export default function ChatPanel({
   member,
   stream,
   initialMessages,
+  memberDirectory,
   isMuted: initialMuted,
   onEmojiReaction,
   onTipBanner,
@@ -43,6 +45,11 @@ export default function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+  const memberById = useMemo(() => {
+    const map = new Map(memberDirectory.map((directoryMember) => [directoryMember.id, directoryMember]))
+    map.set(member.id, member)
+    return map
+  }, [memberDirectory, member])
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
@@ -69,6 +76,15 @@ export default function ChatPanel({
       .on('broadcast', { event: 'mute_message' }, ({ payload }) => {
         const { message_id } = payload as { message_id: string }
         setMutedMessageIds((prev) => new Set([...prev, message_id]))
+      })
+      .on('broadcast', { event: 'delete_message' }, ({ payload }) => {
+        const { message_id } = payload as { message_id: string }
+        setMessages((prev) => prev.filter((message) => message.id !== message_id))
+        setMutedMessageIds((prev) => {
+          const next = new Set(prev)
+          next.delete(message_id)
+          return next
+        })
       })
       .on('broadcast', { event: 'member_muted' }, ({ payload }) => {
         const { member_id } = payload as { member_id: string }
@@ -221,13 +237,23 @@ export default function ChatPanel({
         )}
 
         {messages.map((msg) => (
-          <ChatMessageRow
-            key={msg.id}
-            message={msg}
-            currentMember={member}
-            isMuted={mutedMessageIds.has(msg.id)}
-            streamId={stream?.id}
-          />
+          (() => {
+            const sender = memberById.get(msg.member_id)
+            return (
+              <ChatMessageRow
+                key={msg.id}
+                message={msg}
+                currentMember={member}
+                senderBadges={sender?.access_badges}
+                senderIsModerator={sender?.is_moderator ?? false}
+                isMuted={mutedMessageIds.has(msg.id)}
+                streamId={stream?.id}
+                onDeleted={(messageId) =>
+                  setMessages((prev) => prev.filter((message) => message.id !== messageId))
+                }
+              />
+            )
+          })()
         ))}
         <div ref={bottomRef} />
       </div>

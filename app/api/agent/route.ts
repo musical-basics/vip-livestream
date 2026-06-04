@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { verifyAgentKey, agentUnauthorized } from '@/lib/agent-auth'
+import { MEMBER_BADGES } from '@/lib/member-badges'
 
 /**
  * GET /api/agent
@@ -27,13 +28,14 @@ export async function GET(request: NextRequest) {
       },
       members: {
         'GET /api/agent/members':    'List all members. Query: ?moderators_only=true|false, ?banned=true|false',
-        'POST /api/agent/members':   'Add a new member. Body: { name, email, is_moderator?, display_name? }. Returns login_url and assigned_password.',
-        'PATCH /api/agent/members':  'Update a member. Body: { member_id, display_name?, is_moderator?, is_banned?, regenerate_token? }. Regeneration returns login_url and assigned_password.',
+        'POST /api/agent/members':   'Add a new member. Body: { name, email, is_moderator?, display_name?, access_badges? }. Badge IDs: vip_member, private_student, dreamplay_buyer.',
+        'PATCH /api/agent/members':  'Update a member. Body: { member_id, display_name?, access_badges?, is_moderator?, is_banned?, regenerate_token? }. Regeneration returns login_url and assigned_password.',
         'DELETE /api/agent/members': 'Remove a member. Body: { member_id }',
       },
       messages: {
         'GET /api/agent/messages':   'Get chat messages. Query: ?stream_id=<uuid>&limit=50&include_muted=true',
         'PATCH /api/agent/messages': 'Mute or unmute a message. Body: { message_id, stream_id, is_muted: true|false }',
+        'DELETE /api/agent/messages': 'Delete a chat message. Body: { message_id, stream_id }',
       },
       moderation: {
         'POST /api/agent/moderation':   'Issue a timeout or permanent mute. Body: { action: "timeout"|"mute", member_id, stream_id, minutes? (null=permanent) }',
@@ -50,8 +52,9 @@ export async function GET(request: NextRequest) {
         'POST /api/agent/broadcast': 'Send a realtime event to all connected clients. Body: { stream_id, event, payload }',
       },
     },
+    member_badges: MEMBER_BADGES,
     broadcast_events: [
-      'new_message', 'mute_message', 'member_muted', 'stream_live',
+      'new_message', 'mute_message', 'delete_message', 'member_muted', 'stream_live',
       'stream_ended', 'tip_received', 'announcement',
     ],
   })

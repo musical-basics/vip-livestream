@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase-server'
 import WatchPageClient from '@/components/watch/WatchPageClient'
-import type { Stream } from '@/lib/database.types'
+import type { Member, Stream } from '@/lib/database.types'
 
 export default async function WatchPage() {
   const member = await getSession()
@@ -34,7 +34,7 @@ export default async function WatchPage() {
   ).data
 
   // Fetch all stream-dependent data in parallel once we have a stream
-  const [messagesRes, commentsRes, timeoutRes] = stream
+  const [messagesRes, commentsRes, timeoutRes, membersRes] = stream
     ? await Promise.all([
         supabase
           .from('chat_messages')
@@ -57,8 +57,12 @@ export default async function WatchPage() {
           .or(`timeout_until.is.null,timeout_until.gt.${new Date().toISOString()}`)
           .limit(1)
           .maybeSingle(),
+        supabase
+          .from('members')
+          .select('*')
+          .eq('is_banned', false),
       ])
-    : [{ data: [] }, { data: [] }, { data: null }]
+    : [{ data: [] }, { data: [] }, { data: null }, { data: [] }]
 
   return (
     <WatchPageClient
@@ -66,6 +70,7 @@ export default async function WatchPage() {
       stream={stream}
       initialMessages={((messagesRes.data as any[]) || []).reverse()}
       initialComments={(commentsRes.data as any[]) || []}
+      memberDirectory={(membersRes.data as Member[]) || []}
       isMuted={!!timeoutRes.data}
     />
   )

@@ -49,6 +49,10 @@ console.log(`mode:  ${APPLY ? "APPLY (writing to DB)" : "DRY-RUN (no writes)"}`)
 console.log(`store: ${shopDomain}`);
 console.log(`app:   ${APP_URL}\n`);
 
+function isMissingAccessBadgesColumn(error) {
+  return error?.code === "PGRST204" || error?.message?.includes("access_badges");
+}
+
 // ─── 1. Pull livestream purchasers from Shopify (paginated) ─────────────────
 function parseNextPageInfo(linkHeader) {
   if (!linkHeader) return null;
@@ -160,20 +164,32 @@ for (const p of alreadyMembers) {
 for (const p of toCreate) {
   const token = crypto.randomUUID();
   if (APPLY) {
-    const { data, error } = await supabase
+    const payload = {
+      name: p.name,
+      email: p.email,
+      password_token: token,
+      access_badges: ["dreamplay_buyer"],
+      display_name: p.name,
+      is_moderator: false,
+    };
+    let { data, error } = await supabase
       .from("members")
       .upsert(
-        {
-          name: p.name,
-          email: p.email,
-          password_token: token,
-          display_name: p.name,
-          is_moderator: false,
-        },
+        payload,
         { onConflict: "email", ignoreDuplicates: false }
       )
       .select()
       .single();
+    if (error && isMissingAccessBadgesColumn(error)) {
+      const { access_badges: _accessBadges, ...legacyPayload } = payload;
+      const retry = await supabase
+        .from("members")
+        .upsert(legacyPayload, { onConflict: "email", ignoreDuplicates: false })
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
     if (error) {
       console.error(`  ❌ ${p.email}: ${error.message}`);
       continue;

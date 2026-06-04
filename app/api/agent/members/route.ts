@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { verifyAgentKey, agentUnauthorized } from '@/lib/agent-auth'
+import { MEMBER_BADGES, normalizeMemberBadges } from '@/lib/member-badges'
 import { createServiceClient } from '@/lib/supabase-server'
 import crypto from 'crypto'
 
@@ -36,33 +37,37 @@ export async function GET(request: NextRequest) {
     assigned_password: m.password_token,
   }))
 
-  return Response.json({ members, count: members.length })
+  return Response.json({ members, count: members.length, available_badges: MEMBER_BADGES })
 }
 
 /**
  * POST /api/agent/members
  * Add a new member. Returns their login credentials.
- * Body: { name, email, is_moderator?, display_name? }
+ * Body: { name, email, is_moderator?, display_name?, access_badges? }
  */
 export async function POST(request: NextRequest) {
   if (!verifyAgentKey(request)) return agentUnauthorized()
 
-  const { name, email, is_moderator, display_name } = await request.json()
+  const { name, email, is_moderator, display_name, access_badges } = await request.json()
   if (!name || !email) return Response.json({ error: 'name and email are required' }, { status: 400 })
 
   const password_token = crypto.randomUUID()
   const supabase = createServiceClient()
+  const insert: Record<string, unknown> = {
+    name,
+    email: email.trim().toLowerCase(),
+    password_token,
+    display_name: display_name ?? name,
+    is_moderator: is_moderator ?? false,
+  }
+  if (access_badges !== undefined) {
+    insert.access_badges = normalizeMemberBadges(access_badges)
+  }
 
   const { data, error } = await supabase
     .from('members')
     .upsert(
-      {
-        name,
-        email: email.trim().toLowerCase(),
-        password_token,
-        display_name: display_name ?? name,
-        is_moderator: is_moderator ?? false,
-      },
+      insert,
       { onConflict: 'email', ignoreDuplicates: false }
     )
     .select()
@@ -81,7 +86,7 @@ export async function POST(request: NextRequest) {
 /**
  * PATCH /api/agent/members
  * Update a member's properties.
- * Body: { member_id, display_name?, is_moderator?, is_banned?, regenerate_token? }
+ * Body: { member_id, display_name?, access_badges?, is_moderator?, is_banned?, regenerate_token? }
  * If regenerate_token=true, a new assigned password is returned.
  */
 export async function PATCH(request: NextRequest) {
@@ -94,6 +99,9 @@ export async function PATCH(request: NextRequest) {
   const update: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in rest) update[key] = rest[key]
+  }
+  if ('access_badges' in rest) {
+    update.access_badges = normalizeMemberBadges(rest.access_badges)
   }
 
   if (regenerate_token) {
