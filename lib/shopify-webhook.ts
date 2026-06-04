@@ -8,18 +8,31 @@ import { createServiceClient } from '@/lib/supabase-server'
 export const LIVESTREAM_VARIANT_ID = '43999228330027'
 
 /**
- * Verify a Shopify webhook HMAC. Webhooks registered via the Admin API are
- * signed with the app's client secret — that value lives in SHOPIFY_WEBHOOK_SECRET.
+ * Verify a Shopify webhook HMAC.
+ *
+ * Depending on how a webhook was created, Shopify signs it with either the
+ * store's webhook signing secret (SHOPIFY_WEBHOOK_SECRET) or the app's client
+ * secret (SHOPIFY_CLIENT_SECRET). We accept a match against any configured
+ * candidate — every candidate is still a full HMAC check, so this widens which
+ * secret works without weakening verification.
  */
 export function verifyShopifyWebhook(rawBody: string, hmacHeader: string | null): boolean {
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET
-  if (!secret || !hmacHeader) return false
+  if (!hmacHeader) return false
 
-  const computed = createHmac('sha256', secret).update(rawBody, 'utf8').digest('base64')
-  const a = Buffer.from(computed)
-  const b = Buffer.from(hmacHeader)
-  if (a.length !== b.length) return false
-  return timingSafeEqual(a, b)
+  const candidates = [
+    process.env.SHOPIFY_WEBHOOK_SECRET,
+    process.env.SHOPIFY_CLIENT_SECRET,
+    process.env.SHOPIFY_API_SECRET,
+  ].filter((s): s is string => Boolean(s))
+  if (candidates.length === 0) return false
+
+  const provided = Buffer.from(hmacHeader)
+  return candidates.some((secret) => {
+    const computed = Buffer.from(
+      createHmac('sha256', secret).update(rawBody, 'utf8').digest('base64')
+    )
+    return computed.length === provided.length && timingSafeEqual(computed, provided)
+  })
 }
 
 type ShopifyLineItem = { variant_id?: number | string | null }
