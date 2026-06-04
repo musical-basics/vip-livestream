@@ -81,6 +81,7 @@ for (const topic of TOPICS) {
   console.log(`+ ${topic} registered (${out.webhookSubscription.id})`)
 }
 
-console.log('\nNext steps:')
-console.log('1. Ensure SHOPIFY_WEBHOOK_SECRET=<app client secret> is set in Vercel (Production + Preview).')
-console.log('2. Redeploy so the endpoint can verify incoming webhook signatures.')
+console.log('\nNote: the endpoint verifies the HMAC against SHOPIFY_WEBHOOK_SECRET *or*')
+console.log('SHOPIFY_CLIENT_SECRET. For this store, Shopify signs with the 32-char')
+console.log('SHOPIFY_WEBHOOK_SECRET. Both must be set in Vercel (Production + Preview),')
+console.log('with a redeploy after any change, for incoming webhooks to verify.')
