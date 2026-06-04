@@ -16,7 +16,7 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vip.musicalbasics.com'
 
 const MEMBERS = [
-  { name: 'Test Viewer', email: 'test@musicalbasics.com', password: 'vip-test-2026' },
+  { name: 'Test Viewer', email: 'test@musicalbasics.com', password: 'test' },
   // { name: 'Jane Doe', email: 'jane@example.com', is_moderator: false },
   // { name: 'John Smith', email: 'john@example.com', is_moderator: true },
   // Add your members here...

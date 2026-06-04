@@ -146,9 +146,9 @@ ALTER PUBLICATION supabase_realtime ADD TABLE vip_livestream.streams;
 -- Test livestream viewer
 -- Login URL: https://vip.musicalbasics.com
 -- Email: test@musicalbasics.com
--- Assigned password: vip-test-2026
+-- Assigned password: test
 INSERT INTO vip_livestream.members (name, email, password_token, display_name, is_moderator, is_banned)
-VALUES ('Test Viewer', 'test@musicalbasics.com', 'vip-test-2026', 'Test Viewer', false, false)
+VALUES ('Test Viewer', 'test@musicalbasics.com', 'test', 'Test Viewer', false, false)
 ON CONFLICT (email) DO UPDATE SET
   name = EXCLUDED.name,
   password_token = EXCLUDED.password_token,
