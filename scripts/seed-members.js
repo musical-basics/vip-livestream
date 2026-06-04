@@ -4,8 +4,7 @@
  * Usage: node scripts/seed-members.js
  *
  * Edit the MEMBERS array below with real names and emails.
- * Each member gets a unique password_token (UUID).
- * The script outputs the invitation links to share.
+ * Each member gets an assigned password to email with the login URL.
  */
 
 const { createClient } = require('@supabase/supabase-js')
@@ -17,6 +16,7 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vip.musicalbasics.com'
 
 const MEMBERS = [
+  { name: 'Test Viewer', email: 'test@musicalbasics.com', password: 'vip-test-2026' },
   // { name: 'Jane Doe', email: 'jane@example.com', is_moderator: false },
   // { name: 'John Smith', email: 'john@example.com', is_moderator: true },
   // Add your members here...
@@ -44,16 +44,18 @@ async function main() {
   const results = []
 
   for (const member of MEMBERS) {
-    const token = crypto.randomUUID()
+    const email = member.email.trim().toLowerCase()
+    const password = member.password || crypto.randomUUID()
     const { data, error } = await supabase
       .from('members')
       .upsert(
         {
           name: member.name,
-          email: member.email,
-          password_token: token,
+          email,
+          password_token: password,
           display_name: member.name,
           is_moderator: member.is_moderator ?? false,
+          is_banned: false,
         },
         { onConflict: 'email', ignoreDuplicates: false }
       )
@@ -61,21 +63,22 @@ async function main() {
       .single()
 
     if (error) {
-      console.error(`❌ Failed to add ${member.name} (${member.email}):`, error.message)
+      console.error(`❌ Failed to add ${member.name} (${email}):`, error.message)
     } else {
-      const link = `${APP_URL}?password=${data.password_token}`
-      results.push({ name: member.name, email: member.email, link })
-      console.log(`✅ ${member.name} (${member.email})`)
-      console.log(`   🔗 ${link}\n`)
+      results.push({ name: member.name, email, password: data.password_token })
+      console.log(`✅ ${member.name} (${email})`)
+      console.log(`   Login: ${APP_URL}`)
+      console.log(`   Password: ${data.password_token}\n`)
     }
   }
 
   console.log('\n─────────────────────────────────────')
-  console.log('Invitation links ready to send:')
+  console.log('Login credentials ready to email:')
   console.log('─────────────────────────────────────')
-  results.forEach(({ name, email, link }) => {
+  results.forEach(({ name, email, password }) => {
     console.log(`${name} <${email}>`)
-    console.log(`  ${link}`)
+    console.log(`  Login: ${APP_URL}`)
+    console.log(`  Password: ${password}`)
   })
 }
 

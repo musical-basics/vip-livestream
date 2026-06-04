@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
       },
       members: {
         'GET /api/agent/members':    'List all members. Query: ?moderators_only=true|false, ?banned=true|false',
-        'POST /api/agent/members':   'Add a new member. Body: { name, email, is_moderator?, display_name? }. Returns invite_link.',
-        'PATCH /api/agent/members':  'Update a member. Body: { member_id, display_name?, is_moderator?, is_banned?, regenerate_token? }',
+        'POST /api/agent/members':   'Add a new member. Body: { name, email, is_moderator?, display_name? }. Returns login_url and assigned_password.',
+        'PATCH /api/agent/members':  'Update a member. Body: { member_id, display_name?, is_moderator?, is_banned?, regenerate_token? }. Regeneration returns login_url and assigned_password.',
         'DELETE /api/agent/members': 'Remove a member. Body: { member_id }',
       },
       messages: {

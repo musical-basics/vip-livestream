@@ -1,24 +1,8 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
-import { autoLoginAction } from './actions'
 import LoginForm from '@/components/LoginForm'
 
-interface PageProps {
-  searchParams: Promise<{ password?: string }>
-}
-
-export default async function HomePage({ searchParams }: PageProps) {
-  const params = await searchParams
-
-  // Auto-login via ?password= token
-  if (params.password) {
-    const member = await autoLoginAction(params.password)
-    if (member) {
-      redirect('/watch')
-    }
-    // Invalid token — fall through to show login form with error
-  }
-
+export default async function HomePage() {
   // Already logged in
   const session = await getSession()
   if (session) {
@@ -65,13 +49,13 @@ export default async function HomePage({ searchParams }: PageProps) {
           <p className="text-muted-foreground text-sm leading-relaxed">
             An intimate piano performance, exclusively for you.
             <br />
-            Enter your personal access password below.
+            Enter your invitation email and assigned password below.
           </p>
         </div>
 
         {/* Login card */}
         <div className="glass rounded-2xl p-8 shadow-2xl">
-          <LoginForm invalidToken={!!params.password} />
+          <LoginForm />
         </div>
 
         {/* Footer */}

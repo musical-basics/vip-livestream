@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS vip_livestream.members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   email text UNIQUE NOT NULL,
+  -- Internal name kept for compatibility; this is the assigned password emailed to the member.
   password_token text UNIQUE NOT NULL,
   display_name text,
   is_moderator boolean NOT NULL DEFAULT false,
@@ -141,3 +142,15 @@ ALTER PUBLICATION supabase_realtime ADD TABLE vip_livestream.streams;
 -- ============================================================
 -- INSERT INTO vip_livestream.streams (title, youtube_video_id, is_live, description)
 -- VALUES ('VIP Piano Recital — June 2026', 'YOUR_YOUTUBE_VIDEO_ID', false, 'An intimate evening of classical piano.');
+
+-- Test livestream viewer
+-- Login URL: https://vip.musicalbasics.com
+-- Email: test@musicalbasics.com
+-- Assigned password: vip-test-2026
+INSERT INTO vip_livestream.members (name, email, password_token, display_name, is_moderator, is_banned)
+VALUES ('Test Viewer', 'test@musicalbasics.com', 'vip-test-2026', 'Test Viewer', false, false)
+ON CONFLICT (email) DO UPDATE SET
+  name = EXCLUDED.name,
+  password_token = EXCLUDED.password_token,
+  display_name = EXCLUDED.display_name,
+  is_banned = false;

@@ -1,28 +1,25 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { validatePasswordToken } from '@/lib/auth'
-import { setSession } from '@/lib/auth'
+import { setSession, validateMemberCredentials } from '@/lib/auth'
 
 export async function loginAction(formData: FormData) {
+  const email = formData.get('email') as string
   const password = formData.get('password') as string
+
+  if (!email?.trim()) {
+    return { error: 'Please enter the email address from your invitation.' }
+  }
+
   if (!password?.trim()) {
     return { error: 'Please enter your access password.' }
   }
 
-  const member = await validatePasswordToken(password.trim())
+  const member = await validateMemberCredentials(email, password)
   if (!member) {
-    return { error: 'Invalid password. Please check your invitation email.' }
+    return { error: 'Invalid email or password. Please check your invitation email.' }
   }
 
   await setSession(member.id)
   redirect('/watch')
-}
-
-export async function autoLoginAction(token: string) {
-  const member = await validatePasswordToken(token)
-  if (!member) return null
-
-  await setSession(member.id)
-  return member
 }

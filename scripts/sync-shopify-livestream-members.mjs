@@ -3,10 +3,10 @@
  * Sync Shopify livestream purchasers → vip_livestream.members
  *
  * Pulls everyone who bought the Belgium Concert Livestream product from Shopify
- * and upserts them as members (each new member gets a password_token + invite link).
+ * and upserts them as members (each new member gets an assigned password).
  *
  * Idempotent: existing members (matched by email) keep their current
- * password_token — re-running never invalidates already-sent invite links.
+ * assigned password, so re-running never invalidates already-sent credentials.
  *
  * Usage:
  *   node --env-file=.env.local scripts/sync-shopify-livestream-members.mjs           # dry-run (default)
@@ -15,7 +15,7 @@
  * Required env (in .env.local):
  *   SHOPIFY_STORE_DOMAIN, SHOPIFY_ADMIN_API_TOKEN, SHOPIFY_API_VERSION
  *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- *   NEXT_PUBLIC_APP_URL (optional, for invite links)
+ *   NEXT_PUBLIC_APP_URL (optional, for the login URL)
  */
 
 import crypto from "node:crypto";
@@ -153,7 +153,7 @@ for (const p of alreadyMembers) {
     name: p.name,
     email: p.email,
     status: "existing",
-    link: `${APP_URL}?password=${row.password_token}`,
+    password: row.password_token,
   });
 }
 
@@ -182,7 +182,7 @@ for (const p of toCreate) {
       name: p.name,
       email: p.email,
       status: "created",
-      link: `${APP_URL}?password=${data.password_token}`,
+      password: data.password_token,
     });
     console.log(`  ✅ created  ${p.name} <${p.email}>`);
   } else {
@@ -190,19 +190,20 @@ for (const p of toCreate) {
       name: p.name,
       email: p.email,
       status: "would-create",
-      link: `${APP_URL}?password=${token}  (token generated on --apply)`,
+      password: `${token}  (password generated on --apply)`,
     });
     console.log(`  + would create  ${p.name} <${p.email}>  [${p.status}]`);
   }
 }
 
-// ─── 4. Summary + invite links ──────────────────────────────────────────────
+// ─── 4. Summary + login credentials ─────────────────────────────────────────
 console.log("\n─────────────────────────────────────");
-console.log(APPLY ? "Invite links:" : "Existing members' invite links (re-runnable):");
+console.log(APPLY ? "Login credentials:" : "Existing members' login credentials (re-runnable):");
 console.log("─────────────────────────────────────");
 for (const inv of invites) {
   console.log(`${inv.name} <${inv.email}>  [${inv.status}]`);
-  console.log(`  ${inv.link}`);
+  console.log(`  Login: ${APP_URL}`);
+  console.log(`  Password: ${inv.password}`);
 }
 
 if (!APPLY) {

@@ -49,8 +49,8 @@ export type ProvisionResult =
 
 /**
  * Idempotently provision a member from a livestream order. If a member with the
- * same email already exists, their password_token is preserved (so any invite
- * link already sent keeps working) — we never regenerate on a webhook re-fire.
+ * same email already exists, their assigned password is preserved, so already
+ * emailed credentials keep working. We never regenerate on a webhook re-fire.
  */
 export async function provisionLivestreamMember(order: ShopifyOrder): Promise<ProvisionResult> {
   const c = order.customer ?? {}

@@ -29,10 +29,11 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query
   if (error) return Response.json({ error: error.message }, { status: 500 })
 
-  // Attach invite links (never expose password_token directly in list — include it here for agent use)
+  // Attach login credentials for agent-assisted invitation emails.
   const members = (data ?? []).map(m => ({
     ...m,
-    invite_link: `${APP_URL}?password=${m.password_token}`,
+    login_url: APP_URL,
+    assigned_password: m.password_token,
   }))
 
   return Response.json({ members, count: members.length })
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/agent/members
- * Add a new member. Returns their invite link.
+ * Add a new member. Returns their login credentials.
  * Body: { name, email, is_moderator?, display_name? }
  */
 export async function POST(request: NextRequest) {
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
     .upsert(
       {
         name,
-        email,
+        email: email.trim().toLowerCase(),
         password_token,
         display_name: display_name ?? name,
         is_moderator: is_moderator ?? false,
@@ -72,7 +73,8 @@ export async function POST(request: NextRequest) {
   return Response.json({
     ok: true,
     member: data,
-    invite_link: `${APP_URL}?password=${data.password_token}`,
+    login_url: APP_URL,
+    assigned_password: data.password_token,
   }, { status: 201 })
 }
 
@@ -80,7 +82,7 @@ export async function POST(request: NextRequest) {
  * PATCH /api/agent/members
  * Update a member's properties.
  * Body: { member_id, display_name?, is_moderator?, is_banned?, regenerate_token? }
- * If regenerate_token=true, a new password_token is issued and a new invite_link is returned.
+ * If regenerate_token=true, a new assigned password is returned.
  */
 export async function PATCH(request: NextRequest) {
   if (!verifyAgentKey(request)) return agentUnauthorized()
@@ -111,7 +113,7 @@ export async function PATCH(request: NextRequest) {
   return Response.json({
     ok: true,
     member: data,
-    ...(regenerate_token && { invite_link: `${APP_URL}?password=${data.password_token}` }),
+    ...(regenerate_token && { login_url: APP_URL, assigned_password: data.password_token }),
   })
 }
 
