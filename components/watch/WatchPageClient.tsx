@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type PointerEvent as ReactPointerEvent } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import type { Member, Stream, ChatMessage, Comment } from '@/lib/database.types'
@@ -16,13 +16,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MessageSquare, Music2, MessageCircle } from 'lucide-react'
 
 // ── Resize bounds ─────────────────────────────────────────────
-const MIN_CHAT_WIDTH   = 260
+const MIN_CHAT_WIDTH   = 280
 const MAX_CHAT_WIDTH   = 720
 const DEFAULT_CHAT_WIDTH = 400
 
-const MIN_BOTTOM_HEIGHT   = 160
-const MAX_BOTTOM_HEIGHT   = 700
-const DEFAULT_BOTTOM_HEIGHT = 320
+const MIN_VIDEO_HEIGHT = 220
+const MIN_BOTTOM_HEIGHT = 160
+const DEFAULT_VIDEO_HEIGHT = 360
 
 // ── Types ─────────────────────────────────────────────────────
 interface WatchPageClientProps {
@@ -35,11 +35,17 @@ interface WatchPageClientProps {
 }
 
 // ── Drag handle components ────────────────────────────────────
-function VerticalDivider({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
+type ResizeMode = 'chat' | 'bottom'
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function VerticalDivider({ onPointerDown }: { onPointerDown: (e: ReactPointerEvent) => void }) {
   return (
     <div
-      onMouseDown={onMouseDown}
-      className="hidden lg:flex w-[6px] cursor-col-resize flex-col items-center justify-center flex-shrink-0 group relative z-10"
+      onPointerDown={onPointerDown}
+      className="hidden lg:flex w-3 cursor-col-resize touch-none flex-col items-center justify-center flex-shrink-0 group relative z-10"
       style={{ background: 'transparent' }}
       title="Drag to resize"
     >
@@ -60,11 +66,11 @@ function VerticalDivider({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) =
   )
 }
 
-function HorizontalDivider({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
+function HorizontalDivider({ onPointerDown }: { onPointerDown: (e: ReactPointerEvent) => void }) {
   return (
     <div
-      onMouseDown={onMouseDown}
-      className="hidden lg:flex h-[6px] cursor-row-resize items-center justify-center flex-shrink-0 group relative z-10"
+      onPointerDown={onPointerDown}
+      className="hidden lg:flex h-3 cursor-row-resize touch-none items-center justify-center flex-shrink-0 group relative z-10"
       style={{ background: 'transparent' }}
       title="Drag to resize"
     >
@@ -102,68 +108,109 @@ export default function WatchPageClient({
 
   // Resize state (desktop only)
   const [chatWidth, setChatWidth]       = useState(DEFAULT_CHAT_WIDTH)
-  const [bottomHeight, setBottomHeight] = useState(DEFAULT_BOTTOM_HEIGHT)
+  const [videoHeight, setVideoHeight]   = useState(DEFAULT_VIDEO_HEIGHT)
   const [isDesktop, setIsDesktop]       = useState(false)
+  const [resizeMode, setResizeMode]     = useState<ResizeMode | null>(null)
 
   // Drag tracking refs
-  const isDraggingChat   = useRef(false)
-  const isDraggingBottom = useRef(false)
-  const lastMouseX       = useRef(0)
-  const lastMouseY       = useRef(0)
+  const mainLayoutRef = useRef<HTMLDivElement>(null)
+  const leftColumnRef = useRef<HTMLDivElement>(null)
+  const videoWrapRef  = useRef<HTMLDivElement>(null)
+  const hasResizedVideoRef = useRef(false)
+  const dragStateRef  = useRef<{
+    mode: ResizeMode
+    startX: number
+    startY: number
+    startChatWidth: number
+    startVideoHeight: number
+  } | null>(null)
+
+  const getMaxChatWidth = useCallback(() => {
+    const layoutWidth = mainLayoutRef.current?.getBoundingClientRect().width ?? window.innerWidth
+    return Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, layoutWidth - 360))
+  }, [])
+
+  const getMaxVideoHeight = useCallback(() => {
+    const columnHeight = leftColumnRef.current?.getBoundingClientRect().height
+      ?? mainLayoutRef.current?.getBoundingClientRect().height
+      ?? window.innerHeight
+    return Math.max(MIN_VIDEO_HEIGHT, columnHeight - MIN_BOTTOM_HEIGHT - 12)
+  }, [])
+
+  const getNaturalVideoHeight = useCallback(() => {
+    const columnWidth = leftColumnRef.current?.getBoundingClientRect().width ?? window.innerWidth
+    return Math.round(columnWidth * 9 / 16)
+  }, [])
 
   // Detect desktop breakpoint
   useEffect(() => {
-    const check = () => setIsDesktop(window.innerWidth >= 1024)
+    const check = () => {
+      const desktop = window.innerWidth >= 1024
+      setIsDesktop(desktop)
+      if (desktop) {
+        setChatWidth((width) => clamp(width, MIN_CHAT_WIDTH, getMaxChatWidth()))
+        setVideoHeight((height) =>
+          clamp(
+            hasResizedVideoRef.current ? height : getNaturalVideoHeight(),
+            MIN_VIDEO_HEIGHT,
+            getMaxVideoHeight()
+          )
+        )
+      }
+    }
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
-  }, [])
+  }, [getMaxChatWidth, getMaxVideoHeight, getNaturalVideoHeight])
 
-  // Global drag event listeners (attached once)
+  // Global pointer listeners keep resizing stable even over iframes and scrollable panes.
   useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      if (isDraggingChat.current) {
-        const dx = lastMouseX.current - e.clientX  // left = wider chat
-        lastMouseX.current = e.clientX
-        setChatWidth(w => Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, w + dx)))
-      }
-      if (isDraggingBottom.current) {
-        const dy = e.clientY - lastMouseY.current  // down = taller bottom panel
-        lastMouseY.current = e.clientY
-        setBottomHeight(h => Math.min(MAX_BOTTOM_HEIGHT, Math.max(MIN_BOTTOM_HEIGHT, h + dy)))
-      }
-    }
-    const onMouseUp = () => {
-      if (isDraggingChat.current || isDraggingBottom.current) {
-        isDraggingChat.current   = false
-        isDraggingBottom.current = false
-        document.body.style.cursor     = ''
-        document.body.style.userSelect = ''
+    const onPointerMove = (e: PointerEvent) => {
+      const dragState = dragStateRef.current
+      if (!dragState) return
+      e.preventDefault()
+
+      if (dragState.mode === 'chat') {
+        const delta = dragState.startX - e.clientX
+        setChatWidth(clamp(dragState.startChatWidth + delta, MIN_CHAT_WIDTH, getMaxChatWidth()))
+      } else {
+        const delta = e.clientY - dragState.startY
+        setVideoHeight(clamp(dragState.startVideoHeight + delta, MIN_VIDEO_HEIGHT, getMaxVideoHeight()))
       }
     }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup',   onMouseUp)
+
+    const stopResize = () => {
+      dragStateRef.current = null
+      setResizeMode(null)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    window.addEventListener('pointermove', onPointerMove, { passive: false })
+    window.addEventListener('pointerup', stopResize)
+    window.addEventListener('pointercancel', stopResize)
     return () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup',   onMouseUp)
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', stopResize)
+      window.removeEventListener('pointercancel', stopResize)
     }
-  }, [])
+  }, [getMaxChatWidth, getMaxVideoHeight])
 
-  const startChatDrag = useCallback((e: React.MouseEvent) => {
+  const startResize = useCallback((mode: ResizeMode, e: ReactPointerEvent) => {
+    if (!isDesktop) return
     e.preventDefault()
-    isDraggingChat.current = true
-    lastMouseX.current     = e.clientX
-    document.body.style.cursor     = 'col-resize'
+    dragStateRef.current = {
+      mode,
+      startX: e.clientX,
+      startY: e.clientY,
+      startChatWidth: chatWidth,
+      startVideoHeight: videoHeight,
+    }
+    if (mode === 'bottom') hasResizedVideoRef.current = true
+    setResizeMode(mode)
+    document.body.style.cursor = mode === 'chat' ? 'col-resize' : 'row-resize'
     document.body.style.userSelect = 'none'
-  }, [])
-
-  const startBottomDrag = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    isDraggingBottom.current = true
-    lastMouseY.current       = e.clientY
-    document.body.style.cursor     = 'row-resize'
-    document.body.style.userSelect = 'none'
-  }, [])
+  }, [chatWidth, isDesktop, videoHeight])
 
   // Auto-refresh page when stream goes live or ends
   useEffect(() => {
@@ -200,8 +247,14 @@ export default function WatchPageClient({
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex h-screen flex-col overflow-hidden">
       <Header member={member} stream={stream} />
+      {resizeMode && (
+        <div
+          className="fixed inset-0 z-[9999]"
+          style={{ cursor: resizeMode === 'chat' ? 'col-resize' : 'row-resize' }}
+        />
+      )}
 
       {/* Tip banner */}
       {tipBanner && (
@@ -214,24 +267,27 @@ export default function WatchPageClient({
       )}
 
       {/* ── Main layout ───────────────────────────────── */}
-      <div className="flex flex-1 flex-col lg:flex-row gap-0 overflow-hidden">
+      <div ref={mainLayoutRef} className="flex min-h-0 flex-1 flex-col lg:flex-row gap-0 overflow-hidden">
 
         {/* ── Left column: Video + Tabs ── */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div ref={leftColumnRef} className="flex-1 flex min-h-0 flex-col min-w-0 overflow-hidden">
 
           {/* Video player */}
-          <div className="relative flex-shrink-0">
-            <VideoPlayer stream={stream} />
+          <div
+            ref={videoWrapRef}
+            className="relative flex-shrink-0"
+            style={isDesktop ? { height: videoHeight } : undefined}
+          >
+            <VideoPlayer stream={stream} fill={isDesktop} />
             <EmojiOverlay emojis={floatingEmojis} />
           </div>
 
-          {/* ── Vertical drag handle (video ↕ tabs) ── */}
-          <HorizontalDivider onMouseDown={startBottomDrag} />
+          {/* ── Horizontal drag handle (video ↕ tabs) ── */}
+          <HorizontalDivider onPointerDown={(e) => startResize('bottom', e)} />
 
           {/* Below video: tabs */}
           <div
-            className="overflow-y-auto p-4 lg:p-6"
-            style={isDesktop ? { height: bottomHeight, flexShrink: 0 } : { flex: 1 }}
+            className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6"
           >
             <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
               <div>
@@ -276,7 +332,7 @@ export default function WatchPageClient({
         </div>
 
         {/* ── Horizontal drag handle (left ↔ chat) ── */}
-        <VerticalDivider onMouseDown={startChatDrag} />
+        <VerticalDivider onPointerDown={(e) => startResize('chat', e)} />
 
         {/* ── Right: Chat panel ── */}
         <div
