@@ -63,6 +63,7 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
   }>({ isPlaying: false, playerState: 'loading', videoId: null })
   const [isPlayerMuted, setIsPlayerMuted] = useState(true)
   const hasLiveVideo = !!stream?.is_live && !!videoId
+  const playerMountKey = videoId ?? 'waiting'
   const playerState = playback.videoId === videoId ? playback.playerState : 'loading'
   const isPlaying = playback.videoId === videoId ? playback.isPlaying : false
 
@@ -71,21 +72,13 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
     if (!window.YT?.Player || !playerElement || !videoId) return
 
     if (playerRef.current?.destroy) {
-      try {
-        playerRef.current.destroy()
-      } catch (err) {
-        console.error('Error destroying player:', err)
-      }
+      playerRef.current.destroy()
       playerRef.current = null
     }
 
     playerElement.innerHTML = ''
 
-    const ytAnchor = document.createElement('div')
-    ytAnchor.className = 'w-full h-full'
-    playerElement.appendChild(ytAnchor)
-
-    playerRef.current = new window.YT.Player(ytAnchor, {
+    playerRef.current = new window.YT.Player(playerElement, {
       width: '100%',
       height: '100%',
       videoId,
@@ -233,7 +226,7 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
       )}
 
       {/* YouTube embed container */}
-      <div ref={playerElementRef} className="w-full h-full" />
+      <div key={playerMountKey} ref={playerElementRef} className="w-full h-full" />
 
       {playerState === 'ready' && (
         <button
