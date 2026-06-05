@@ -17,16 +17,17 @@ export async function getVerifiedLiveStream(supabase: ServiceClient) {
   for (const stream of candidates) {
     const metadata = await fetchYouTubeVideoMetadata(stream.youtube_video_id, { revalidate: 30 })
 
-    if (metadata.broadcastStatus === 'live') {
-      return stream
-    }
-
     if (metadata.broadcastStatus === 'ended') {
       await supabase
         .from('streams')
         .update({ is_live: false })
         .eq('id', stream.id)
+      continue
     }
+
+    // For 'live', 'waiting', or 'unknown' (rate-limited/network error),
+    // we trust the database state and return the active stream.
+    return stream
   }
 
   return null

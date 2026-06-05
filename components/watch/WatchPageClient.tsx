@@ -279,7 +279,7 @@ export default function WatchPageClient({
       }
     }
 
-    const interval = window.setInterval(checkForStreamChange, 10000)
+    const interval = window.setInterval(checkForStreamChange, 60000)
     return () => {
       isDisposed = true
       window.clearInterval(interval)
