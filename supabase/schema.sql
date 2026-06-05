@@ -76,13 +76,16 @@ CREATE TABLE IF NOT EXISTS vip_livestream.streams (
   is_live boolean NOT NULL DEFAULT false,
   setlist jsonb,
   description text,
-  slow_mode_delay integer NOT NULL DEFAULT 0,
+  slow_mode_delay integer NOT NULL DEFAULT 10,
   pinned_message jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE vip_livestream.streams
-  ADD COLUMN IF NOT EXISTS slow_mode_delay integer NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS slow_mode_delay integer NOT NULL DEFAULT 10;
+
+ALTER TABLE vip_livestream.streams
+  ALTER COLUMN slow_mode_delay SET DEFAULT 10;
 
 ALTER TABLE vip_livestream.streams
   ADD COLUMN IF NOT EXISTS pinned_message jsonb;

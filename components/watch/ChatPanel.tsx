@@ -7,13 +7,14 @@ import ChatMessageRow from './ChatMessageRow'
 import EmojiPicker from './EmojiPicker'
 import DisplayNameEditor from './DisplayNameEditor'
 import { Button } from '@/components/ui/button'
-import { Loader2, Send, Smile, ChevronUp, Users, Pin, X } from 'lucide-react'
+import { Loader2, Send, Smile, Users, Pin, X } from 'lucide-react'
 import EmojiOverlay from './EmojiOverlay'
 import { canModerateChat, roleLabel } from '@/lib/roles'
 
 const PAGE_SIZE = 50
 const MAX_MESSAGES_IN_MEMORY = 300
 const AUTO_SCROLL_THRESHOLD_PX = 96
+const LOAD_MORE_SCROLL_THRESHOLD_PX = 80
 const textareaAutoSizeStyle: CSSProperties & { fieldSizing?: string } = { fieldSizing: 'content' }
 
 function appendMessage(messages: ChatMessage[], message: ChatMessage) {
@@ -83,6 +84,7 @@ interface ChatPanelProps {
   isMuted: boolean
   onEmojiReaction: (emoji: string) => void
   onTipBanner: (tip: { name: string; amount: number; message?: string }) => void
+  highlightNameEditor?: boolean
 }
 
 export default function ChatPanel({
@@ -93,6 +95,7 @@ export default function ChatPanel({
   isMuted: initialMuted,
   onEmojiReaction,
   onTipBanner,
+  highlightNameEditor = false,
 }: ChatPanelProps) {
   const streamId = stream?.id
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
@@ -207,12 +210,56 @@ export default function ChatPanel({
     }
   }, [])
 
+  // Load older messages (scroll up pagination)
+  const loadMore = useCallback(async () => {
+    if (!streamId || isLoadingMore || !hasMore) return
+    const oldestMsg = messages[0]
+    if (!oldestMsg) return
+
+    shouldAutoScrollRef.current = false
+    setIsLoadingMore(true)
+    try {
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('stream_id', streamId)
+        .eq('is_muted', false)
+        .lt('created_at', oldestMsg.created_at)
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE)
+
+      if (data && data.length > 0) {
+        setMessages((prev) => {
+          const next = [...data.reverse(), ...prev]
+          return next.length > MAX_MESSAGES_IN_MEMORY ? next.slice(0, MAX_MESSAGES_IN_MEMORY) : next
+        })
+        setHasMore(data.length >= PAGE_SIZE)
+        // Restore scroll position (don't jump to bottom)
+        const container = scrollRef.current
+        if (container) {
+          const prevHeight = container.scrollHeight
+          setTimeout(() => {
+            container.scrollTop = container.scrollHeight - prevHeight
+          }, 0)
+        }
+      } else {
+        setHasMore(false)
+      }
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [hasMore, isLoadingMore, messages, streamId, supabase])
+
   const handleScroll = useCallback(() => {
     const container = scrollRef.current
     if (!container) return
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
     shouldAutoScrollRef.current = distanceFromBottom < AUTO_SCROLL_THRESHOLD_PX
-  }, [])
+
+    if (container.scrollTop <= LOAD_MORE_SCROLL_THRESHOLD_PX) {
+      void loadMore()
+    }
+  }, [loadMore])
 
   // Realtime subscriptions
   useEffect(() => {
@@ -298,46 +345,6 @@ export default function ChatPanel({
       supabase.removeChannel(channel)
     }
   }, [streamId, member.id, displayName, onTipBanner, supabase, spawnEmojiBurst, onEmojiReaction])
-
-  // Load older messages (scroll up pagination)
-  async function loadMore() {
-    if (!streamId || isLoadingMore || !hasMore) return
-    const oldestMsg = messages[0]
-    if (!oldestMsg) return
-
-    shouldAutoScrollRef.current = false
-    setIsLoadingMore(true)
-    try {
-      const { data } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('stream_id', streamId)
-        .eq('is_muted', false)
-        .lt('created_at', oldestMsg.created_at)
-        .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE)
-
-      if (data && data.length > 0) {
-        setMessages((prev) => {
-          const next = [...data.reverse(), ...prev]
-          return next.length > MAX_MESSAGES_IN_MEMORY ? next.slice(0, MAX_MESSAGES_IN_MEMORY) : next
-        })
-        setHasMore(data.length >= PAGE_SIZE)
-        // Restore scroll position (don't jump to bottom)
-        const container = scrollRef.current
-        if (container) {
-          const prevHeight = container.scrollHeight
-          setTimeout(() => {
-            container.scrollTop = container.scrollHeight - prevHeight
-          }, 0)
-        }
-      } else {
-        setHasMore(false)
-      }
-    } finally {
-      setIsLoadingMore(false)
-    }
-  }
 
   const sendMessage = useCallback(async (content?: string, emoji?: string) => {
     if (!streamId) return
@@ -485,6 +492,7 @@ export default function ChatPanel({
           member={member}
           displayName={displayName}
           onChange={setDisplayName}
+          highlight={highlightNameEditor}
         />
         <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
           {canModerateChat(member) && (
@@ -543,20 +551,11 @@ export default function ChatPanel({
         onScroll={handleScroll}
         className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-3 space-y-1"
       >
-        {/* Load more button */}
-        {hasMore && (
-          <button
-            onClick={loadMore}
-            disabled={isLoadingMore}
-            className="w-full flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {isLoadingMore ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <ChevronUp className="w-3 h-3" />
-            )}
-            {isLoadingMore ? 'Loading…' : 'Load earlier messages'}
-          </button>
+        {isLoadingMore && (
+          <div className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Loading earlier messages
+          </div>
         )}
 
         {messages.length === 0 && (

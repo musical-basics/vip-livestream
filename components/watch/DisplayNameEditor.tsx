@@ -8,12 +8,16 @@ interface DisplayNameEditorProps {
   member: Member
   displayName: string
   onChange: (name: string) => void
+  highlight?: boolean
 }
 
-export default function DisplayNameEditor({ member, displayName, onChange }: DisplayNameEditorProps) {
+export default function DisplayNameEditor({ member, displayName, onChange, highlight }: DisplayNameEditorProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(displayName)
   const [isSaving, setIsSaving] = useState(false)
+  const [hasDismissedHighlight, setHasDismissedHighlight] = useState(false)
+
+  const showHighlight = highlight && !hasDismissedHighlight && !isEditing
 
   async function save() {
     if (!draft.trim() || draft === displayName) {
@@ -68,14 +72,43 @@ export default function DisplayNameEditor({ member, displayName, onChange }: Dis
   }
 
   return (
-    <button
-      onClick={() => setIsEditing(true)}
-      className="flex items-center gap-1.5 group hover:opacity-80 transition-opacity"
-    >
-      <span className="text-xs font-medium" style={{ color: 'oklch(0.75 0.12 85)' }}>
-        {displayName}
-      </span>
-      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-    </button>
+    <div className="relative">
+      <button
+        onClick={() => {
+          setIsEditing(true)
+          setHasDismissedHighlight(true)
+        }}
+        className={`flex items-center gap-1.5 group hover:opacity-80 transition-all rounded-lg px-2 py-1 ${
+          showHighlight
+            ? 'ring-2 ring-[oklch(0.75_0.12_85)] bg-[oklch(0.75_0.12_85)/10] animate-pulse scale-105'
+            : ''
+        }`}
+      >
+        <span className="text-xs font-semibold" style={{ color: 'oklch(0.75 0.12 85)' }}>
+          {displayName}
+        </span>
+        <Pencil className={`w-3.5 h-3.5 transition-all ${
+          showHighlight
+            ? 'text-[oklch(0.75_0.12_85)] opacity-100'
+            : 'text-muted-foreground/60 group-hover:text-foreground group-hover:opacity-100'
+        }`} />
+      </button>
+
+      {showHighlight && (
+        <div className="absolute top-full left-0 mt-2.5 z-50 bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] text-[10px] font-bold px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap animate-bounce flex items-center gap-1.5">
+          <span>You can change your name here!</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setHasDismissedHighlight(true)
+            }}
+            className="hover:opacity-80 ml-0.5 p-0.5"
+            title="Dismiss tooltip"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

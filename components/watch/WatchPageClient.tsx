@@ -432,6 +432,7 @@ export default function WatchPageClient({
             isMuted={isMuted}
             onEmojiReaction={addFloatingEmoji}
             onTipBanner={setTipBanner}
+            highlightNameEditor={showConcertAnnouncement}
           />
         </div>
 
