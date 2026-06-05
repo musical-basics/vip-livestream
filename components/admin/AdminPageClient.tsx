@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Member, Stream } from '@/lib/database.types'
 import { MEMBER_BADGES, getMemberBadge, normalizeMemberBadges, type MemberBadgeId } from '@/lib/member-badges'
+import { ROLE_BADGE } from '@/lib/roles'
 import { extractYouTubeVideoId } from '@/lib/youtube'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -507,13 +508,13 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                       <span className="text-xs text-muted-foreground">({m.name})</span>
                     )}
                     {m.is_admin && (
-                      <Badge variant="outline" className="text-[10px] border-[oklch(0.8_0.15_85)/50] text-[oklch(0.8_0.15_85)] tracking-wide">
-                        ADMIN
+                      <Badge variant="outline" className={`text-[10px] tracking-wide ${ROLE_BADGE.ADMIN.className}`}>
+                        {ROLE_BADGE.ADMIN.emoji} ADMIN
                       </Badge>
                     )}
                     {m.is_moderator && (
-                      <Badge variant="outline" className="text-[10px] border-[oklch(0.75_0.12_85)/40] text-[oklch(0.75_0.12_85)] tracking-wide">
-                        MOD
+                      <Badge variant="outline" className={`text-[10px] tracking-wide ${ROLE_BADGE.MOD.className}`}>
+                        {ROLE_BADGE.MOD.emoji} MOD
                       </Badge>
                     )}
                     {m.is_banned && (

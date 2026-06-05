@@ -59,8 +59,6 @@ export default function ChatPanel({
   const [slowModeDelay, setSlowModeDelay] = useState(stream?.slow_mode_delay || 0)
   const [isUpdatingSlowMode, setIsUpdatingSlowMode] = useState(false)
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
-  const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(null)
-  const [activeMenuPosition, setActiveMenuPosition] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     setPinnedMessage((stream?.pinned_message as unknown as ChatMessage) || null)
@@ -77,26 +75,6 @@ export default function ChatPanel({
     }, 1000)
     return () => clearTimeout(timer)
   }, [cooldownRemaining])
-
-  useEffect(() => {
-    if (!activeMenuMessageId) return
-
-    function handleGlobalClose(e: Event) {
-      if ((e.target as Element).closest('.mod-menu-container')) {
-        return
-      }
-      setActiveMenuMessageId(null)
-      setActiveMenuPosition(null)
-    }
-
-    window.addEventListener('pointerdown', handleGlobalClose, true)
-    window.addEventListener('contextmenu', handleGlobalClose, true)
-
-    return () => {
-      window.removeEventListener('pointerdown', handleGlobalClose, true)
-      window.removeEventListener('contextmenu', handleGlobalClose, true)
-    }
-  }, [activeMenuMessageId])
 
   const spawnEmojiBurst = useCallback((emoji: string, count = 6) => {
     setChatFloatingEmojis((prev) => {
@@ -529,12 +507,6 @@ export default function ChatPanel({
                 isPinned={pinnedMessage?.id === msg.id}
                 onPinToggle={handlePinToggle}
                 onReacted={handleMessageReacted}
-                activeMenuMessageId={activeMenuMessageId}
-                activeMenuPosition={activeMenuPosition}
-                setActiveMenu={(messageId, position) => {
-                  setActiveMenuMessageId(messageId)
-                  setActiveMenuPosition(position)
-                }}
               />
             )
           })()

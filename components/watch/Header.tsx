@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import type { Member, Stream } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
-import { isAdmin, roleLabel } from '@/lib/roles'
+import { isAdmin, roleBadge } from '@/lib/roles'
 import { LogOut, Radio, Settings, Film } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -15,6 +15,7 @@ interface HeaderProps {
 export default function Header({ member, stream }: HeaderProps) {
   const router = useRouter()
   const memberBadges = normalizeMemberBadges(member.access_badges)
+  const memberRoleBadge = roleBadge(member)
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -61,9 +62,10 @@ export default function Header({ member, stream }: HeaderProps) {
           <span className="text-sm text-muted-foreground">
             {member.display_name || member.name}
           </span>
-          {roleLabel(member) && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[oklch(0.75_0.12_85)/15] text-[oklch(0.75_0.12_85)] border border-[oklch(0.75_0.12_85)/30] tracking-wide">
-              {roleLabel(member)}
+          {memberRoleBadge && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border tracking-wide font-medium ${memberRoleBadge.className}`}>
+              <span className="mr-1">{memberRoleBadge.emoji}</span>
+              {memberRoleBadge.label}
             </span>
           )}
           {memberBadges.map((badgeId) => {

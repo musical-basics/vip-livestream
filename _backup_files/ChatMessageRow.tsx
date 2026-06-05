@@ -23,9 +23,6 @@ interface ChatMessageRowProps {
   onDeleted: (messageId: string) => void
   onReacted: (messageId: string, reactions: Record<string, string[]>) => void
   onPinToggle: (message: ChatMessage) => void
-  activeMenuMessageId: string | null
-  activeMenuPosition: { x: number; y: number } | null
-  setActiveMenu: (messageId: string | null, position: { x: number; y: number } | null) => void
 }
 
 const TIMEOUT_OPTIONS = [
@@ -59,11 +56,31 @@ function ChatMessageRow({
   onDeleted,
   onReacted,
   onPinToggle,
-  activeMenuMessageId,
-  activeMenuPosition,
-  setActiveMenu,
 }: ChatMessageRowProps) {
+  const [modMenuPosition, setModMenuPosition] = useState<{ x: number; y: number } | null>(null)
   const [isActing, setIsActing] = useState(false)
+
+  useEffect(() => {
+    if (!modMenuPosition) return
+
+    function handleGlobalClose(e: Event) {
+      if ((e.target as Element).closest('.mod-menu-container')) {
+        return
+      }
+      setModMenuPosition(null)
+    }
+
+    const timer = setTimeout(() => {
+      window.addEventListener('pointerdown', handleGlobalClose)
+      window.addEventListener('contextmenu', handleGlobalClose)
+    }, 0)
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('pointerdown', handleGlobalClose)
+      window.removeEventListener('contextmenu', handleGlobalClose)
+    }
+  }, [modMenuPosition])
 
   const isMod = canModerateChat(currentMember)
   const isOwn = message.member_id === currentMember.id
@@ -73,7 +90,7 @@ function ChatMessageRow({
   function openContextMenu(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    setActiveMenu(message.id, {
+    setModMenuPosition({
       x: Math.min(e.clientX, window.innerWidth - 210),
       y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
     })
@@ -82,7 +99,7 @@ function ChatMessageRow({
   async function handleToggleReaction(emoji: string) {
     if (!streamId) return
     setIsActing(true)
-    setActiveMenu(null, null)
+    setModMenuPosition(null)
     try {
       const res = await fetch('/api/chat/react', {
         method: 'POST',
@@ -107,7 +124,7 @@ function ChatMessageRow({
   async function handleTimeout(minutes: number | null) {
     if (!streamId) return
     setIsActing(true)
-    setActiveMenu(null, null)
+    setModMenuPosition(null)
     try {
       await fetch('/api/mod/timeout', {
         method: 'POST',
@@ -126,7 +143,7 @@ function ChatMessageRow({
   async function handleMuteMessage() {
     if (!streamId) return
     setIsActing(true)
-    setActiveMenu(null, null)
+    setModMenuPosition(null)
     try {
       const res = await fetch('/api/mod/delete-message', {
         method: 'DELETE',
@@ -214,9 +231,9 @@ function ChatMessageRow({
           {message.content || message.emoji}
         </span>
         <span className="text-[10px] text-muted-foreground ml-auto">[muted]</span>
-        {activeMenuMessageId === message.id && activeMenuPosition && (
+        {modMenuPosition && (
           <ModMenu
-            position={activeMenuPosition}
+            position={modMenuPosition}
             isOwn={isOwn}
             isActing={isActing}
             currentMember={currentMember}
@@ -225,10 +242,7 @@ function ChatMessageRow({
             onReact={handleToggleReaction}
             onDelete={handleMuteMessage}
             onTimeout={handleTimeout}
-            onPinToggle={() => {
-              setActiveMenu(null, null)
-              onPinToggle(message)
-            }}
+            onPinToggle={() => onPinToggle(message)}
           />
         )}
       </div>
@@ -250,14 +264,14 @@ function ChatMessageRow({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              if (activeMenuMessageId === message.id) {
-                setActiveMenu(null, null)
-              } else {
-                setActiveMenu(message.id, {
-                  x: Math.min(e.clientX, window.innerWidth - 210),
-                  y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
-                })
-              }
+              setModMenuPosition((position) =>
+                position
+                  ? null
+                  : {
+                      x: Math.min(e.clientX, window.innerWidth - 210),
+                      y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
+                    }
+              )
             }}
             className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
             title={isMod ? "Moderator actions & reactions" : "React to message"}
@@ -283,9 +297,9 @@ function ChatMessageRow({
         <div className="text-lg py-0.5">{message.emoji}</div>
         {renderReactions()}
 
-        {activeMenuMessageId === message.id && activeMenuPosition && (
+        {modMenuPosition && (
           <ModMenu
-            position={activeMenuPosition}
+            position={modMenuPosition}
             isOwn={isOwn}
             isActing={isActing}
             currentMember={currentMember}
@@ -294,10 +308,7 @@ function ChatMessageRow({
             onReact={handleToggleReaction}
             onDelete={handleMuteMessage}
             onTimeout={handleTimeout}
-            onPinToggle={() => {
-              setActiveMenu(null, null)
-              onPinToggle(message)
-            }}
+            onPinToggle={() => onPinToggle(message)}
           />
         )}
       </div>
@@ -317,14 +328,14 @@ function ChatMessageRow({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (activeMenuMessageId === message.id) {
-              setActiveMenu(null, null)
-            } else {
-              setActiveMenu(message.id, {
-                x: Math.min(e.clientX, window.innerWidth - 210),
-                y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
-              })
-            }
+            setModMenuPosition((position) =>
+              position
+                ? null
+                : {
+                    x: Math.min(e.clientX, window.innerWidth - 210),
+                    y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
+                  }
+            )
           }}
           className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
           title={isMod ? "Moderator actions & reactions" : "React to message"}
@@ -353,9 +364,9 @@ function ChatMessageRow({
 
       {renderReactions()}
 
-      {activeMenuMessageId === message.id && activeMenuPosition && (
+      {modMenuPosition && (
         <ModMenu
-          position={activeMenuPosition}
+          position={modMenuPosition}
           isOwn={isOwn}
           isActing={isActing}
           currentMember={currentMember}
@@ -364,10 +375,7 @@ function ChatMessageRow({
           onReact={handleToggleReaction}
           onDelete={handleMuteMessage}
           onTimeout={handleTimeout}
-          onPinToggle={() => {
-            setActiveMenu(null, null)
-            onPinToggle(message)
-          }}
+          onPinToggle={() => onPinToggle(message)}
         />
       )}
     </div>
