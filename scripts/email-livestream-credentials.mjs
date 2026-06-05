@@ -141,6 +141,8 @@ function renderEmail({ name, email, password }) {
   return { text, html };
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function sendEmail({ to, subject, html, text }) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -240,6 +242,8 @@ async function main() {
       failures.push({ email: m.email, password, error: e.message });
       console.log(`  ✗ FAILED     ${m.email.padEnd(34)} pw=${password} :${e.message}`);
     }
+    // Stay under Resend's 5 requests/second limit.
+    await sleep(300);
   }
 
   if (APPLY) {
