@@ -406,6 +406,12 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
           <Archive className="h-3.5 w-3.5" />
           Recordings
         </Link>
+        <Link href="/logs" className="rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-white/8 hover:text-foreground">
+          Logs
+        </Link>
+        <Link href="/analytics" className="rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-white/8 hover:text-foreground">
+          Analytics
+        </Link>
         {liveStream && (
           <div className="min-w-0 flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 sm:ml-auto">
             <Radio className="w-3 h-3 text-red-400" />

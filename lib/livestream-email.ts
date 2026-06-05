@@ -37,14 +37,20 @@ export function renderCredentialsEmail({
   name,
   email,
   password,
+  memberId,
 }: {
   name: string
   email: string
   password: string
+  /** When set, embeds an open-tracking pixel (/api/track/open?m=<id>). */
+  memberId?: string
 }) {
   const greeting = firstName(name)
   const directUrl = `${APP_URL}/?email=${encodeURIComponent(email)}&pw=${encodeURIComponent(password)}`
   const subject = `Your VIP access for the ${CONCERT.name} livestream`
+  const trackingPixel = memberId
+    ? `<img src="${APP_URL}/api/track/open?m=${encodeURIComponent(memberId)}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;" />`
+    : ''
 
   const text = [
     `Hi ${greeting},`,
@@ -90,6 +96,7 @@ export function renderCredentialsEmail({
       </td></tr>
     </table>
   </td></tr></table>
+  ${trackingPixel}
 </body></html>`
 
   return { subject, text, html }

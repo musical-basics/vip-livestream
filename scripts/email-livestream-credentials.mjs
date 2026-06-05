@@ -105,10 +105,14 @@ function firstName(name) {
   return (name || "").trim().split(/\s+/)[0] || "there";
 }
 
-function renderEmail({ name, email, password }) {
+function renderEmail({ name, email, password, memberId }) {
   const greeting = firstName(name);
   // Direct link: opens the login page with email + password pre-filled and logs in automatically.
   const directUrl = `${APP_URL}/?email=${encodeURIComponent(email)}&pw=${encodeURIComponent(password)}`;
+  // Open-tracking pixel (powers /analytics). Omitted when memberId is absent.
+  const trackingPixel = memberId
+    ? `<img src="${APP_URL}/api/track/open?m=${encodeURIComponent(memberId)}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;" />`
+    : "";
   const text = [
     `Hi ${greeting},`,
     ``,
@@ -153,6 +157,7 @@ function renderEmail({ name, email, password }) {
       </td></tr>
     </table>
   </td></tr></table>
+  ${trackingPixel}
 </body></html>`;
 
   return { text, html };
@@ -209,7 +214,7 @@ async function main() {
     const m = all.find((x) => ONLY.has(x.email.toLowerCase()));
     if (!m) { console.error("❌ no member matches --only"); process.exit(1); }
     const subject = `Your VIP access for the ${CONCERT.name} livestream`;
-    const { html, text } = renderEmail({ name: m.name, email: m.email, password: m.password_token });
+    const { html, text } = renderEmail({ name: m.name, email: m.email, password: m.password_token, memberId: m.id });
     console.log(`PREVIEW of ${m.email}'s real email -> ${PREVIEW_TO}`);
     console.log(`(real password ${m.password_token}; nothing written to the DB; ${m.email} is NOT emailed)\n`);
     const id = await sendEmail({ to: PREVIEW_TO, subject, html, text });
@@ -258,7 +263,7 @@ async function main() {
         continue;
       }
 
-      const { html, text } = renderEmail({ name: m.name, email: m.email, password });
+      const { html, text } = renderEmail({ name: m.name, email: m.email, password, memberId: m.id });
       const id = await sendEmail({ to: m.email, subject, html, text });
       sent++;
       console.log(`  sent  ${m.email.padEnd(34)} pw=${password}  (id ${id})`);

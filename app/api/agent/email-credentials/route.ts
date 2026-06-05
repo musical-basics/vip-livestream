@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
         name: m.name,
         email: m.email,
         password,
+        memberId: m.id,
       })
       const id = await sendCredentialsEmail({ to: m.email, subject, html, text })
       results.push({ email: m.email, ok: true, id, ...(m.is_banned && { banned: true }) })
