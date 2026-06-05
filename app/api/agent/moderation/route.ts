@@ -35,13 +35,13 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // Resolve the moderator_member_id — fall back to the first moderator if not provided
+  // Resolve the moderator_member_id — fall back to the first moderator or admin if not provided
   let muted_by = moderator_member_id
   if (!muted_by) {
     const { data: mod } = await supabase
       .from('members')
       .select('id')
-      .eq('is_moderator', true)
+      .or('is_moderator.eq.true,is_admin.eq.true')
       .limit(1)
       .single()
     muted_by = mod?.id

@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Shield,
   ShieldOff,
+  Crown,
   Ban,
   CheckCircle,
   Loader2,

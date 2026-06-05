@@ -85,6 +85,7 @@ export default function ChatMessageRow({
 
   function openContextMenu(e: React.MouseEvent) {
     e.preventDefault()
+    e.stopPropagation()
     setModMenuPosition({
       x: Math.min(e.clientX, window.innerWidth - 210),
       y: Math.min(e.clientY, window.innerHeight - (isMod ? 280 : 100)),
@@ -254,7 +255,8 @@ export default function ChatMessageRow({
           </span>
           {renderSenderBadges()}
           <button
-            onClick={(e) =>
+            onClick={(e) => {
+              e.stopPropagation()
               setModMenuPosition((position) =>
                 position
                   ? null
@@ -263,7 +265,7 @@ export default function ChatMessageRow({
                       y: Math.min(e.clientY, window.innerHeight - (isMod ? 280 : 100)),
                     }
               )
-            }
+            }}
             className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
             title={isMod ? "Moderator actions & reactions" : "React to message"}
           >
@@ -315,7 +317,8 @@ export default function ChatMessageRow({
         </span>
         {renderSenderBadges()}
         <button
-          onClick={(e) =>
+          onClick={(e) => {
+            e.stopPropagation()
             setModMenuPosition((position) =>
               position
                 ? null
@@ -324,7 +327,7 @@ export default function ChatMessageRow({
                     y: Math.min(e.clientY, window.innerHeight - (isMod ? 280 : 100)),
                   }
             )
-          }
+          }}
           className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
           title={isMod ? "Moderator actions & reactions" : "React to message"}
         >

@@ -96,6 +96,7 @@ export async function provisionLivestreamMember(order: ShopifyOrder): Promise<Pr
     access_badges: ['dreamplay_buyer'],
     display_name: name,
     is_moderator: false,
+    is_admin: false,
   }
   let { data, error } = await supabase
     .from('members')

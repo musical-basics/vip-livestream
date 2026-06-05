@@ -33,9 +33,10 @@ export async function GET(request: NextRequest) {
         'DELETE /api/agent/setlist': 'Remove a stored document so the slug reverts to its code default. Body: { slug } (or ?slug=).',
       },
       members: {
-        'GET /api/agent/members':    'List all members. Query: ?moderators_only=true|false, ?banned=true|false',
-        'POST /api/agent/members':   'Add a new member. Body: { name, email, is_moderator?, display_name?, access_badges? }. Badge IDs: vip_member, private_student, dreamplay_buyer.',
-        'PATCH /api/agent/members':  'Update a member. Body: { member_id, display_name?, access_badges?, is_moderator?, is_banned?, regenerate_token? }. Regeneration returns login_url and assigned_password.',
+        _roles: 'Two roles: is_admin (full access, can assign mods) and is_moderator (chat moderation only). They are independent flags; an admin can also moderate chat.',
+        'GET /api/agent/members':    'List all members. Query: ?moderators_only=true, ?admins_only=true, ?banned=true|false',
+        'POST /api/agent/members':   'Add a new member. Body: { name, email, is_moderator?, is_admin?, display_name?, access_badges? }. Badge IDs: vip_member, private_student, dreamplay_buyer.',
+        'PATCH /api/agent/members':  'Update a member. Body: { member_id, display_name?, access_badges?, is_moderator?, is_admin?, is_banned?, regenerate_token? }. Set is_admin for full access, is_moderator for chat-only. Regeneration returns login_url and assigned_password.',
         'DELETE /api/agent/members': 'Remove a member. Body: { member_id }',
       },
       messages: {
