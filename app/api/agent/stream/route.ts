@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
       description,
       setlist,
       is_live: is_live ?? false,
-      slow_mode_delay: 10,
       ...(is_live === true && { stream_start_utc: new Date().toISOString() }),
     })
     .select()

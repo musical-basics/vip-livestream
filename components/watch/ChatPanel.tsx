@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Send, Smile, Users, Pin, X } from 'lucide-react'
 import EmojiOverlay from './EmojiOverlay'
 import { canModerateChat, roleLabel } from '@/lib/roles'
+import { DEFAULT_SLOW_MODE_DELAY_SECONDS } from '@/lib/chat-settings'
 
 const PAGE_SIZE = 50
 const MAX_MESSAGES_IN_MEMORY = 300
@@ -113,7 +114,7 @@ export default function ChatPanel({
   const [pinnedMessage, setPinnedMessage] = useState<ChatMessage | null>(
     () => (stream?.pinned_message as unknown as ChatMessage) || null
   )
-  const [slowModeDelay, setSlowModeDelay] = useState(stream?.slow_mode_delay || 0)
+  const [slowModeDelay, setSlowModeDelay] = useState(stream?.slow_mode_delay ?? DEFAULT_SLOW_MODE_DELAY_SECONDS)
   const [isUpdatingSlowMode, setIsUpdatingSlowMode] = useState(false)
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(null)

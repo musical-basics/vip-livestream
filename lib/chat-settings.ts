@@ -1,0 +1,1 @@
+export const DEFAULT_SLOW_MODE_DELAY_SECONDS = 10

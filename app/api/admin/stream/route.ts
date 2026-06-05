@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceClient()
   const { data: stream, error } = await supabase
     .from('streams')
-    .insert({ title, youtube_video_id: videoId, description, setlist, is_live: false, slow_mode_delay: 10 })
+    .insert({ title, youtube_video_id: videoId, description, setlist, is_live: false })
     .select()
     .single()
 

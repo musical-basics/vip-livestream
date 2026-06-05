@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase-server'
 import { createClient as createBrowserClient } from '@supabase/supabase-js'
 import { canModerateChat } from '@/lib/roles'
+import { DEFAULT_SLOW_MODE_DELAY_SECONDS } from '@/lib/chat-settings'
 
 const MAX_CONTENT_LENGTH = 500
 const MAX_EMOJI_LENGTH = 32
@@ -49,13 +50,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Check for active slow mode delay
-  const { data: stream } = await supabase
+  const { data: stream, error: streamError } = await supabase
     .from('streams')
     .select('slow_mode_delay')
     .eq('id', stream_id)
     .single()
 
-  const slowModeDelay = stream?.slow_mode_delay || 0
+  const slowModeDelay = streamError
+    ? DEFAULT_SLOW_MODE_DELAY_SECONDS
+    : stream?.slow_mode_delay ?? DEFAULT_SLOW_MODE_DELAY_SECONDS
 
   if (slowModeDelay > 0 && !canModerateChat(member)) {
     const slowModeSince = new Date(Date.now() - slowModeDelay * 1000).toISOString()
