@@ -127,6 +127,57 @@ export default function WatchPageClient({
     streamSources.find((source) => source.videoId) ??
     streamSources[0]
 
+  const [autoSwitchingTo, setAutoSwitchingTo] = useState<{ label: string; id: StreamSourceId; countdown: number } | null>(null)
+
+  useEffect(() => {
+    if (!autoSwitchingTo) return
+
+    if (autoSwitchingTo.countdown <= 0) {
+      setSelectedStreamSource(autoSwitchingTo.id)
+      setAutoSwitchingTo(null)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setAutoSwitchingTo((current) => {
+        if (!current) return null
+        return { ...current, countdown: current.countdown - 1 }
+      })
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [autoSwitchingTo])
+
+  const handlePlaybackError = useCallback((errorVideoId: string) => {
+    if (selectedSource?.videoId !== errorVideoId) return
+
+    const mainSrc = streamSources.find((s) => s.id === 'main')
+    const backup1Src = streamSources.find((s) => s.id === 'backup1')
+    const backup2Src = streamSources.find((s) => s.id === 'backup2')
+
+    let targetSource: typeof mainSrc | undefined = undefined
+
+    if (selectedStreamSource === 'main') {
+      if (backup1Src?.videoId) {
+        targetSource = backup1Src
+      } else if (backup2Src?.videoId) {
+        targetSource = backup2Src
+      }
+    } else if (selectedStreamSource === 'backup1') {
+      if (backup2Src?.videoId) {
+        targetSource = backup2Src
+      }
+    }
+
+    if (targetSource) {
+      setAutoSwitchingTo({
+        label: targetSource.label,
+        id: targetSource.id,
+        countdown: 3,
+      })
+    }
+  }, [selectedStreamSource, selectedSource, streamSources])
+
   // Resize state (desktop only)
   const [chatWidth, setChatWidth]       = useState(DEFAULT_CHAT_WIDTH)
   const [videoHeight, setVideoHeight]   = useState(DEFAULT_VIDEO_HEIGHT)
@@ -472,7 +523,10 @@ export default function WatchPageClient({
                   role="tab"
                   aria-selected={isSelected}
                   disabled={!isAvailable}
-                  onClick={() => setSelectedStreamSource(source.id)}
+                  onClick={() => {
+                    setAutoSwitchingTo(null)
+                    setSelectedStreamSource(source.id)
+                  }}
                   className={`min-h-10 rounded-lg px-2 text-center text-[11px] font-semibold uppercase tracking-wide transition-colors sm:text-xs ${
                     isSelected
                       ? 'bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] shadow-lg shadow-black/20'
@@ -542,6 +596,17 @@ export default function WatchPageClient({
         onClose={closeConcertAnnouncement}
       />
 
+      {/* Auto-switching countdown notification */}
+      {autoSwitchingTo && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-red-950/90 border border-red-500/30 text-red-200 px-4 py-3 rounded-xl shadow-2xl backdrop-blur-md animate-[bounce_1s_infinite] max-w-xs sm:max-w-md w-auto">
+          <RefreshCw className="w-4 h-4 animate-spin text-red-400 shrink-0 animate-[spin_2s_linear_infinite]" />
+          <div className="text-xs text-left">
+            <span className="font-semibold block text-red-300">Feed Disruption Detected</span>
+            <span>Switching to {autoSwitchingTo.label} in {autoSwitchingTo.countdown}s...</span>
+          </div>
+        </div>
+      )}
+
       {isDesktop ? (
         /* Desktop: video + tabs on the left, chat on the right */
         <div ref={mainLayoutRef} className="flex flex-1 min-h-0 flex-row overflow-hidden">
@@ -551,7 +616,12 @@ export default function WatchPageClient({
               className="relative w-full max-w-[1920px] mx-auto flex-shrink-0 bg-black"
               style={{ height: videoHeight }}
             >
-              <VideoPlayer stream={stream} fill videoId={selectedSource?.videoId} />
+              <VideoPlayer
+                stream={stream}
+                fill
+                videoId={selectedSource?.videoId}
+                onPlaybackError={handlePlaybackError}
+              />
               <EmojiOverlay emojis={floatingEmojis} />
             </div>
 
@@ -585,7 +655,11 @@ export default function WatchPageClient({
         /* Mobile: pinned video, then a Chat / Programme tab switcher */
         <div className="flex flex-1 min-h-0 flex-col">
           <div className="relative w-full flex-shrink-0 bg-black">
-            <VideoPlayer stream={stream} videoId={selectedSource?.videoId} />
+            <VideoPlayer
+              stream={stream}
+              videoId={selectedSource?.videoId}
+              onPlaybackError={handlePlaybackError}
+            />
             <EmojiOverlay emojis={floatingEmojis} />
           </div>
 

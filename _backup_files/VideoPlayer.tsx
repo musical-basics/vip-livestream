@@ -8,6 +8,7 @@ interface VideoPlayerProps {
   stream: Stream | null
   fill?: boolean
   videoId?: string | null
+  onPlaybackError?: (errorVideoId: string) => void
 }
 
 type PlayerStatus = 'loading' | 'ready' | 'offline'
@@ -51,7 +52,12 @@ declare global {
   }
 }
 
-export default function VideoPlayer({ stream, fill = false, videoId: selectedVideoId }: VideoPlayerProps) {
+export default function VideoPlayer({
+  stream,
+  fill = false,
+  videoId: selectedVideoId,
+  onPlaybackError,
+}: VideoPlayerProps) {
   const videoId = selectedVideoId?.trim() || stream?.youtube_video_id?.trim() || null
   const playerRef = useRef<YouTubePlayer | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -63,7 +69,6 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
   }>({ isPlaying: false, playerState: 'loading', videoId: null })
   const [isPlayerMuted, setIsPlayerMuted] = useState(true)
   const hasLiveVideo = !!stream?.is_live && !!videoId
-  const playerMountKey = videoId ?? 'waiting'
   const playerState = playback.videoId === videoId ? playback.playerState : 'loading'
   const isPlaying = playback.videoId === videoId ? playback.isPlaying : false
 
@@ -72,13 +77,21 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
     if (!window.YT?.Player || !playerElement || !videoId) return
 
     if (playerRef.current?.destroy) {
-      playerRef.current.destroy()
+      try {
+        playerRef.current.destroy()
+      } catch (err) {
+        console.error('Error destroying player:', err)
+      }
       playerRef.current = null
     }
 
     playerElement.innerHTML = ''
 
-    playerRef.current = new window.YT.Player(playerElement, {
+    const ytAnchor = document.createElement('div')
+    ytAnchor.className = 'w-full h-full'
+    playerElement.appendChild(ytAnchor)
+
+    playerRef.current = new window.YT.Player(ytAnchor, {
       width: '100%',
       height: '100%',
       videoId,
@@ -96,9 +109,15 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
       events: {
         onReady: (event) => {
           try {
-            event.target.mute?.()
+            const isMutedPref = localStorage.getItem('watch_player_muted') !== 'false'
+            if (isMutedPref) {
+              event.target.mute?.()
+              setIsPlayerMuted(true)
+            } else {
+              event.target.unMute?.()
+              setIsPlayerMuted(false)
+            }
             event.target.playVideo?.()
-            setIsPlayerMuted(true)
             setPlayback({ isPlaying: true, playerState: 'ready', videoId })
           } catch (err) {
             console.error('YouTube play error:', err)
@@ -115,16 +134,20 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
         },
         onError: () => {
           setPlayback({ isPlaying: false, playerState: 'offline', videoId })
+          if (onPlaybackError) {
+            onPlaybackError(videoId)
+          }
         },
       },
     })
-  }, [videoId])
+  }, [videoId, onPlaybackError])
 
   const unmutePlayer = useCallback(() => {
     if (!playerRef.current) return
     try {
       playerRef.current.unMute?.()
       setIsPlayerMuted(false)
+      localStorage.setItem('watch_player_muted', 'false')
     } catch (err) {
       console.error('YouTube unmute error:', err)
     }
@@ -226,7 +249,7 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
       )}
 
       {/* YouTube embed container */}
-      <div key={playerMountKey} ref={playerElementRef} className="w-full h-full" />
+      <div ref={playerElementRef} className="w-full h-full" />
 
       {playerState === 'ready' && (
         <button

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, type PointerEvent as ReactPointerEvent } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, type PointerEvent as ReactPointerEvent } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import type { Member, Stream, ChatMessage, Comment, SetlistItem } from '@/lib/database.types'
@@ -14,7 +14,8 @@ import Header from './Header'
 import TipBanner from './TipBanner'
 import ConcertAnnouncementDialog from './ConcertAnnouncementDialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MessageSquare, Music2, MessageCircle } from 'lucide-react'
+import { MessageSquare, Music2, MessageCircle, RefreshCw } from 'lucide-react'
+import { getStreamSources, type StreamSourceId } from '@/lib/stream-sources'
 
 // ── Resize bounds ─────────────────────────────────────────────
 const MIN_CHAT_WIDTH   = 280
@@ -25,7 +26,6 @@ const MIN_VIDEO_HEIGHT = 220
 const MIN_BOTTOM_HEIGHT = 160
 const DEFAULT_VIDEO_HEIGHT = 360
 const STREAM_SYNC_POLL_MS = 5 * 60 * 1000
-const STREAM_REFRESH_DEBOUNCE_MS = 1000
 
 // ── Types ─────────────────────────────────────────────────────
 interface WatchPageClientProps {
@@ -120,6 +120,63 @@ export default function WatchPageClient({
         }
       : null
   )
+  const [selectedStreamSource, setSelectedStreamSource] = useState<StreamSourceId>('main')
+  const streamSources = useMemo(() => getStreamSources(stream), [stream])
+  const selectedSource =
+    streamSources.find((source) => source.id === selectedStreamSource && source.videoId) ??
+    streamSources.find((source) => source.videoId) ??
+    streamSources[0]
+
+  const [autoSwitchingTo, setAutoSwitchingTo] = useState<{ label: string; id: StreamSourceId; countdown: number } | null>(null)
+
+  useEffect(() => {
+    if (!autoSwitchingTo) return
+
+    if (autoSwitchingTo.countdown <= 0) {
+      setSelectedStreamSource(autoSwitchingTo.id)
+      setAutoSwitchingTo(null)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setAutoSwitchingTo((current) => {
+        if (!current) return null
+        return { ...current, countdown: current.countdown - 1 }
+      })
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [autoSwitchingTo])
+
+  const handlePlaybackError = useCallback((errorVideoId: string) => {
+    if (selectedSource?.videoId !== errorVideoId) return
+
+    const mainSrc = streamSources.find((s) => s.id === 'main')
+    const backup1Src = streamSources.find((s) => s.id === 'backup1')
+    const backup2Src = streamSources.find((s) => s.id === 'backup2')
+
+    let targetSource: typeof mainSrc | undefined = undefined
+
+    if (selectedStreamSource === 'main') {
+      if (backup1Src?.videoId) {
+        targetSource = backup1Src
+      } else if (backup2Src?.videoId) {
+        targetSource = backup2Src
+      }
+    } else if (selectedStreamSource === 'backup1') {
+      if (backup2Src?.videoId) {
+        targetSource = backup2Src
+      }
+    }
+
+    if (targetSource) {
+      setAutoSwitchingTo({
+        label: targetSource.label,
+        id: targetSource.id,
+        countdown: 3,
+      })
+    }
+  }, [selectedStreamSource, selectedSource, streamSources])
 
   // Resize state (desktop only)
   const [chatWidth, setChatWidth]       = useState(DEFAULT_CHAT_WIDTH)
@@ -127,12 +184,26 @@ export default function WatchPageClient({
   const [isDesktop, setIsDesktop]       = useState(false)
   const [resizeMode, setResizeMode]     = useState<ResizeMode | null>(null)
 
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('watch_active_tab') || 'setlist'
+    }
+    return 'setlist'
+  })
+
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value)
+    localStorage.setItem('watch_active_tab', value)
+  }, [])
+
   // Drag tracking refs
   const mainLayoutRef = useRef<HTMLDivElement>(null)
   const leftColumnRef = useRef<HTMLDivElement>(null)
   const videoWrapRef  = useRef<HTMLDivElement>(null)
   const hasResizedVideoRef = useRef(false)
-  const refreshTimerRef = useRef<number | null>(null)
+  const [reloadCountdown, setReloadCountdown] = useState<number | null>(null)
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isReloadingRef = useRef(false)
   const dragStateRef  = useRef<{
     mode: ResizeMode
     startX: number
@@ -230,17 +301,32 @@ export default function WatchPageClient({
   }, [chatWidth, isDesktop, videoHeight])
 
   const refreshWatchPage = useCallback(() => {
-    if (refreshTimerRef.current !== null) return
+    if (isReloadingRef.current) return
+    isReloadingRef.current = true
 
-    refreshTimerRef.current = window.setTimeout(() => {
-      refreshTimerRef.current = null
-      window.location.reload()
-    }, STREAM_REFRESH_DEBOUNCE_MS)
+    const duration = Math.floor(Math.random() * 5) + 3 // 3, 4, 5, 6, or 7 seconds
+    setReloadCountdown(duration)
+
+    let currentCount = duration
+    countdownIntervalRef.current = setInterval(() => {
+      currentCount -= 1
+      if (currentCount <= 0) {
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current)
+          countdownIntervalRef.current = null
+        }
+        window.location.reload()
+      } else {
+        setReloadCountdown(currentCount)
+      }
+    }, 1000)
   }, [])
 
-  useEffect(() => () => {
-    if (refreshTimerRef.current !== null) {
-      window.clearTimeout(refreshTimerRef.current)
+  useEffect(() => {
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+      }
     }
   }, [])
 
@@ -282,11 +368,18 @@ export default function WatchPageClient({
           is_live?: boolean
           stream_id?: string
           youtube_video_id?: string
+          backup_youtube_video_id_1?: string | null
+          backup_youtube_video_id_2?: string | null
         }
 
         const activeStreamChanged =
           data.is_live === true &&
-          (data.stream_id !== stream?.id || data.youtube_video_id !== stream?.youtube_video_id)
+          (
+            data.stream_id !== stream?.id ||
+            data.youtube_video_id !== stream?.youtube_video_id ||
+            (data.backup_youtube_video_id_1 ?? null) !== (stream?.backup_youtube_video_id_1 ?? null) ||
+            (data.backup_youtube_video_id_2 ?? null) !== (stream?.backup_youtube_video_id_2 ?? null)
+          )
         const activeStreamEnded = !!stream?.is_live && data.is_live === false
         const streamCameOnline = !stream?.is_live && data.is_live === true
 
@@ -311,7 +404,14 @@ export default function WatchPageClient({
       window.clearInterval(interval)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [stream?.id, stream?.is_live, stream?.youtube_video_id, refreshWatchPage])
+  }, [
+    stream?.id,
+    stream?.is_live,
+    stream?.youtube_video_id,
+    stream?.backup_youtube_video_id_1,
+    stream?.backup_youtube_video_id_2,
+    refreshWatchPage,
+  ])
 
   // Show tip success notification
   useEffect(() => {
@@ -338,14 +438,148 @@ export default function WatchPageClient({
     }, 2600)
   }
 
-  return (
-    <div className="flex min-h-[100dvh] flex-col lg:h-screen lg:overflow-hidden">
-      <Header member={member} stream={stream} />
-      {resizeMode && (
-        <div
+  const [mobileTab, setMobileTab] = useState<'chat' | 'programme'>('chat')
+
+  // Shared content blocks, rendered in either the desktop split layout or the
+  // mobile tabbed layout. Defined once so nothing double-mounts.
+  const programmeContent = (
+    <>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2
+            className="text-xl font-light leading-tight text-gold sm:text-2xl"
+            style={{ fontFamily: "'Cormorant Garamond', serif" }}
+          >
+            {stream?.title || 'VIP Piano Livestream'}
+          </h2>
+          {stream?.description && (
+            <p className="text-sm text-muted-foreground mt-1">{stream.description}</p>
+          )}
+        </div>
+        <div className="w-full sm:w-auto">
+          <TipButton member={member} stream={stream} />
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList className="glass mb-4 grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+          <TabsTrigger value="setlist" className="flex items-center justify-center gap-2">
+            <Music2 className="w-3.5 h-3.5" />
+            <span>Programme</span>
+          </TabsTrigger>
+          <TabsTrigger value="comments" className="flex items-center justify-center gap-2">
+            <MessageCircle className="w-3.5 h-3.5" />
+            <span>Leave a Note</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="setlist">
+          <SetlistPanel stream={stream} programme={programme} />
+        </TabsContent>
+
+        <TabsContent value="comments">
+          <CommentSection
+            member={member}
+            stream={stream}
+            initialComments={initialComments}
+          />
+        </TabsContent>
+      </Tabs>
+    </>
+  )
+
+  const chatPanel = (
+    <ChatPanel
+      key={stream?.id ?? 'waiting-room'}
+      member={member}
+      stream={stream}
+      initialMessages={initialMessages}
+      memberDirectory={memberDirectory}
+      isMuted={isMuted}
+      onEmojiReaction={addFloatingEmoji}
+      onTipBanner={setTipBanner}
+      highlightNameEditor={showConcertAnnouncement}
+    />
+  )
+
+    return (
+      <div className="flex h-[100dvh] flex-col overflow-hidden">
+        <Header member={member} stream={stream} />
+      {stream && (
+        <div className="border-b border-border/30 bg-black/75 px-3 py-2 backdrop-blur sm:px-4">
+          <div
+            role="tablist"
+            aria-label="Livestream source"
+            className="mx-auto grid w-full max-w-2xl grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1"
+          >
+            {streamSources.map((source) => {
+              const isSelected = selectedSource?.id === source.id
+              const isAvailable = !!source.videoId
+
+              return (
+                <button
+                  key={source.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  disabled={!isAvailable}
+                  onClick={() => {
+                    setAutoSwitchingTo(null)
+                    setSelectedStreamSource(source.id)
+                  }}
+                  className={`min-h-10 rounded-lg px-2 text-center text-[11px] font-semibold uppercase tracking-wide transition-colors sm:text-xs ${
+                    isSelected
+                      ? 'bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] shadow-lg shadow-black/20'
+                      : 'text-muted-foreground hover:bg-white/8 hover:text-foreground'
+                  } disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-muted-foreground`}
+                >
+                  {source.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+        {resizeMode && (
+          <div
           className="fixed inset-0 z-[9999]"
           style={{ cursor: resizeMode === 'chat' ? 'col-resize' : 'row-resize' }}
         />
+      )}
+
+      {reloadCountdown !== null && (
+        <div className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md transition-opacity duration-300">
+          <div className="glass max-w-md w-full mx-4 p-8 rounded-2xl border border-white/10 flex flex-col items-center text-center shadow-2xl relative overflow-hidden">
+            {/* Ambient glow in background */}
+            <div className="absolute -inset-10 bg-[radial-gradient(circle_at_center,oklch(0.75_0.12_85_/_0.15)_0%,transparent_70%)] pointer-events-none" />
+            
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 rounded-full bg-[oklch(0.75_0.12_85)]/10 animate-ping duration-1000" />
+                <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-black/60 text-[oklch(0.75_0.12_85)] shadow-inner">
+                  <RefreshCw className="h-8 w-8 animate-spin" style={{ animationDuration: '3s' }} />
+                </div>
+              </div>
+
+              <h2 className="text-2xl font-light text-gold mb-3" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+                Updating Livestream URL
+              </h2>
+              
+              <p className="text-sm text-muted-foreground mb-8 max-w-xs leading-relaxed">
+                The stream settings are being synchronized. We will reconnect you automatically in a moment.
+              </p>
+
+              <div className="relative flex items-center justify-center">
+                <div className="text-5xl font-extralight text-gold tracking-tight select-none">
+                  {reloadCountdown}
+                </div>
+                <span className="text-xs text-muted-foreground/60 uppercase tracking-widest ml-2 mt-4">
+                  seconds
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Tip banner */}
@@ -362,108 +596,111 @@ export default function WatchPageClient({
         onClose={closeConcertAnnouncement}
       />
 
-      {/* ── Main layout ───────────────────────────────── */}
-      <div ref={mainLayoutRef} className="flex flex-1 flex-col gap-0 lg:min-h-0 lg:flex-row lg:overflow-hidden">
+      {/* Auto-switching countdown notification */}
+      {autoSwitchingTo && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-red-950/90 border border-red-500/30 text-red-200 px-4 py-3 rounded-xl shadow-2xl backdrop-blur-md animate-[bounce_1s_infinite] max-w-xs sm:max-w-md w-auto">
+          <RefreshCw className="w-4 h-4 animate-spin text-red-400 shrink-0 animate-[spin_2s_linear_infinite]" />
+          <div className="text-xs text-left">
+            <span className="font-semibold block text-red-300">Feed Disruption Detected</span>
+            <span>Switching to {autoSwitchingTo.label} in {autoSwitchingTo.countdown}s...</span>
+          </div>
+        </div>
+      )}
 
-        {/* ── Left column: Video + Tabs ── */}
-        <div ref={leftColumnRef} className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
+      {isDesktop ? (
+        /* Desktop: video + tabs on the left, chat on the right */
+        <div ref={mainLayoutRef} className="flex flex-1 min-h-0 flex-row overflow-hidden">
+          <div ref={leftColumnRef} className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden">
+            <div
+              ref={videoWrapRef}
+              className="relative w-full max-w-[1920px] mx-auto flex-shrink-0 bg-black"
+              style={{ height: videoHeight }}
+            >
+              <VideoPlayer
+                stream={stream}
+                fill
+                videoId={selectedSource?.videoId}
+                onPlaybackError={handlePlaybackError}
+              />
+              <EmojiOverlay emojis={floatingEmojis} />
+            </div>
 
-          {/* Video player */}
+            <HorizontalDivider onPointerDown={(e) => startResize('bottom', e)} />
+
+            <div className="flex-1 min-h-0 overflow-y-auto p-6">
+              {programmeContent}
+            </div>
+          </div>
+
+          <VerticalDivider onPointerDown={(e) => startResize('chat', e)} />
+
           <div
-            ref={videoWrapRef}
-            className="relative w-full max-w-[1920px] mx-auto flex-shrink-0 bg-black"
-            style={isDesktop ? { height: videoHeight } : undefined}
+            className="flex min-h-0 flex-col border-l border-border/50"
+            style={{ width: chatWidth, flexShrink: 0 }}
           >
-            <VideoPlayer stream={stream} fill={isDesktop} />
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 glass-heavy">
+              <MessageSquare className="w-4 h-4 text-[oklch(0.75_0.12_85)]" />
+              <span className="text-sm font-medium">Live Chat</span>
+              {stream?.is_live && (
+                <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 live-pulse inline-block" />
+                  LIVE
+                </span>
+              )}
+            </div>
+            {chatPanel}
+          </div>
+        </div>
+      ) : (
+        /* Mobile: pinned video, then a Chat / Programme tab switcher */
+        <div className="flex flex-1 min-h-0 flex-col">
+          <div className="relative w-full flex-shrink-0 bg-black">
+            <VideoPlayer
+              stream={stream}
+              videoId={selectedSource?.videoId}
+              onPlaybackError={handlePlaybackError}
+            />
             <EmojiOverlay emojis={floatingEmojis} />
           </div>
 
-          {/* ── Horizontal drag handle (video ↕ tabs) ── */}
-          <HorizontalDivider onPointerDown={(e) => startResize('bottom', e)} />
-
-          {/* Below video: tabs */}
-          <div
-            className="flex-1 p-3 pb-6 sm:p-4 lg:min-h-0 lg:overflow-y-auto lg:p-6"
-          >
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <h2
-                  className="text-xl font-light leading-tight text-gold sm:text-2xl"
-                  style={{ fontFamily: "'Cormorant Garamond', serif" }}
-                >
-                  {stream?.title || 'VIP Piano Livestream'}
-                </h2>
-                {stream?.description && (
-                  <p className="text-sm text-muted-foreground mt-1">{stream.description}</p>
-                )}
-              </div>
-              <div className="w-full sm:w-auto">
-                <TipButton member={member} stream={stream} />
-              </div>
-            </div>
-
-            <Tabs defaultValue="setlist">
-              <TabsList className="glass mb-4 grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
-                <TabsTrigger value="setlist" className="flex items-center justify-center gap-2">
-                  <Music2 className="w-3.5 h-3.5" />
-                  <span>Programme</span>
-                </TabsTrigger>
-                <TabsTrigger value="comments" className="flex items-center justify-center gap-2">
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span>Leave a Note</span>
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="setlist">
-                <SetlistPanel stream={stream} programme={programme} />
-              </TabsContent>
-
-              <TabsContent value="comments">
-                <CommentSection
-                  member={member}
-                  stream={stream}
-                  initialComments={initialComments}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
-
-        {/* ── Horizontal drag handle (left ↔ chat) ── */}
-        <VerticalDivider onPointerDown={(e) => startResize('chat', e)} />
-
-        {/* ── Right: Chat panel ── */}
-        <div
-          className="flex h-[min(70dvh,560px)] min-h-[420px] flex-col border-t border-border/50 lg:h-auto lg:min-h-0 lg:border-l lg:border-t-0"
-          style={isDesktop
-            ? { width: chatWidth, flexShrink: 0 }
-            : { width: '100%' }
-          }
-        >
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 glass-heavy">
-            <MessageSquare className="w-4 h-4 text-[oklch(0.75_0.12_85)]" />
-            <span className="text-sm font-medium">Live Chat</span>
-            {stream?.is_live && (
-              <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium flex items-center gap-1">
+          <div className="grid grid-cols-2 shrink-0 glass-heavy border-b border-border/50">
+            <button
+              onClick={() => setMobileTab('chat')}
+              className={`flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+                mobileTab === 'chat'
+                  ? 'text-foreground border-b-2 border-[oklch(0.75_0.12_85)]'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              Live Chat
+              {stream?.is_live && (
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400 live-pulse inline-block" />
-                LIVE
-              </span>
-            )}
+              )}
+            </button>
+            <button
+              onClick={() => setMobileTab('programme')}
+              className={`flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+                mobileTab === 'programme'
+                  ? 'text-foreground border-b-2 border-[oklch(0.75_0.12_85)]'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              <Music2 className="w-4 h-4" />
+              Programme
+            </button>
           </div>
-          <ChatPanel
-            key={stream?.id ?? 'waiting-room'}
-            member={member}
-            stream={stream}
-            initialMessages={initialMessages}
-            memberDirectory={memberDirectory}
-            isMuted={isMuted}
-            onEmojiReaction={addFloatingEmoji}
-            onTipBanner={setTipBanner}
-            highlightNameEditor={showConcertAnnouncement}
-          />
-        </div>
 
-      </div>
+          <div className="flex-1 min-h-0">
+            <div className={mobileTab === 'chat' ? 'flex h-full flex-col' : 'hidden'}>
+              {chatPanel}
+            </div>
+            <div className={mobileTab === 'programme' ? 'block h-full overflow-y-auto p-3 pb-6' : 'hidden'}>
+              {programmeContent}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

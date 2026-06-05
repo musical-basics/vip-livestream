@@ -8,6 +8,7 @@ interface VideoPlayerProps {
   stream: Stream | null
   fill?: boolean
   videoId?: string | null
+  onPlaybackError?: (errorVideoId: string) => void
 }
 
 type PlayerStatus = 'loading' | 'ready' | 'offline'
@@ -51,7 +52,12 @@ declare global {
   }
 }
 
-export default function VideoPlayer({ stream, fill = false, videoId: selectedVideoId }: VideoPlayerProps) {
+export default function VideoPlayer({
+  stream,
+  fill = false,
+  videoId: selectedVideoId,
+  onPlaybackError,
+}: VideoPlayerProps) {
   const videoId = selectedVideoId?.trim() || stream?.youtube_video_id?.trim() || null
   const playerRef = useRef<YouTubePlayer | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -103,9 +109,15 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
       events: {
         onReady: (event) => {
           try {
-            event.target.mute?.()
+            const isMutedPref = localStorage.getItem('watch_player_muted') !== 'false'
+            if (isMutedPref) {
+              event.target.mute?.()
+              setIsPlayerMuted(true)
+            } else {
+              event.target.unMute?.()
+              setIsPlayerMuted(false)
+            }
             event.target.playVideo?.()
-            setIsPlayerMuted(true)
             setPlayback({ isPlaying: true, playerState: 'ready', videoId })
           } catch (err) {
             console.error('YouTube play error:', err)
@@ -122,16 +134,20 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
         },
         onError: () => {
           setPlayback({ isPlaying: false, playerState: 'offline', videoId })
+          if (onPlaybackError) {
+            onPlaybackError(videoId)
+          }
         },
       },
     })
-  }, [videoId])
+  }, [videoId, onPlaybackError])
 
   const unmutePlayer = useCallback(() => {
     if (!playerRef.current) return
     try {
       playerRef.current.unMute?.()
       setIsPlayerMuted(false)
+      localStorage.setItem('watch_player_muted', 'false')
     } catch (err) {
       console.error('YouTube unmute error:', err)
     }
