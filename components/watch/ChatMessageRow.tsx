@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { formatDistanceToNow } from 'date-fns'
-import { MoreHorizontal, Trash2, Clock } from 'lucide-react'
+import { MoreHorizontal, Trash2, Clock, Smile } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -19,6 +19,7 @@ interface ChatMessageRowProps {
   isMuted: boolean
   streamId: string | undefined
   onDeleted: (messageId: string) => void
+  onReacted: (messageId: string, reactions: Record<string, string[]>) => void
 }
 
 const TIMEOUT_OPTIONS = [
@@ -49,6 +50,7 @@ export default function ChatMessageRow({
   isMuted,
   streamId,
   onDeleted,
+  onReacted,
 }: ChatMessageRowProps) {
   const [modMenuPosition, setModMenuPosition] = useState<{ x: number; y: number } | null>(null)
   const [isActing, setIsActing] = useState(false)
@@ -80,13 +82,37 @@ export default function ChatMessageRow({
   const color = getMemberColor(message.member_id)
   const visibleBadges = normalizeMemberBadges(senderBadges)
 
-  function openModMenu(e: React.MouseEvent) {
-    if (!isMod) return
+  function openContextMenu(e: React.MouseEvent) {
     e.preventDefault()
     setModMenuPosition({
-      x: Math.min(e.clientX, window.innerWidth - 190),
-      y: Math.min(e.clientY, window.innerHeight - 260),
+      x: Math.min(e.clientX, window.innerWidth - 210),
+      y: Math.min(e.clientY, window.innerHeight - (isMod ? 280 : 100)),
     })
+  }
+
+  async function handleToggleReaction(emoji: string) {
+    if (!streamId) return
+    setIsActing(true)
+    setModMenuPosition(null)
+    try {
+      const res = await fetch('/api/chat/react', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message_id: message.id,
+          emoji,
+          stream_id: streamId,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        onReacted(message.id, data.reactions)
+      }
+    } catch (err) {
+      console.error('Failed to react:', err)
+    } finally {
+      setIsActing(false)
+    }
   }
 
   async function handleTimeout(minutes: number | null) {
@@ -153,12 +179,42 @@ export default function ChatMessageRow({
     )
   }
 
+  function renderReactions() {
+    const rx = message.reactions
+    if (!rx || Object.keys(rx).length === 0) return null
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-1.5 pl-0">
+        {Object.entries(rx).map(([emoji, memberIds]) => {
+          if (!memberIds || memberIds.length === 0) return null
+          const hasReacted = memberIds.includes(currentMember.id)
+          return (
+            <button
+              key={emoji}
+              onClick={() => handleToggleReaction(emoji)}
+              disabled={isActing}
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition-all border ${
+                hasReacted
+                  ? 'bg-[oklch(0.75_0.12_85)/15] border-[oklch(0.75_0.12_85)/40] text-[oklch(0.75_0.12_85)] font-semibold'
+                  : 'bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10 hover:text-foreground'
+              }`}
+              title={`${memberIds.length} reaction${memberIds.length > 1 ? 's' : ''}`}
+            >
+              <span>{emoji}</span>
+              <span>{memberIds.length}</span>
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   if (isMuted) {
     // Moderators see muted messages greyed out; others see nothing
     if (!isMod) return null
     return (
       <div
-        onContextMenu={openModMenu}
+        onContextMenu={openContextMenu}
         className="message-appear flex gap-2 px-2 py-1 rounded-lg opacity-30"
       >
         <span className="text-xs" style={{ color }}>
@@ -168,11 +224,14 @@ export default function ChatMessageRow({
           {message.content || message.emoji}
         </span>
         <span className="text-[10px] text-muted-foreground ml-auto">[muted]</span>
-        {modMenuPosition && isMod && (
+        {modMenuPosition && (
           <ModMenu
             position={modMenuPosition}
             isOwn={isOwn}
             isActing={isActing}
+            currentMember={currentMember}
+            reactions={message.reactions}
+            onReact={handleToggleReaction}
             onDelete={handleMuteMessage}
             onTimeout={handleTimeout}
           />
@@ -185,19 +244,57 @@ export default function ChatMessageRow({
   if (!message.content && message.emoji) {
     return (
       <div
-        onContextMenu={openModMenu}
-        className="message-appear flex items-center gap-1.5 px-2 py-0.5"
+        onContextMenu={openContextMenu}
+        className="message-appear group relative flex flex-col gap-0.5 px-2 py-1 rounded-lg hover:bg-white/3 transition-colors"
       >
-        <span className="text-xs font-medium" style={{ color }}>
-          {message.display_name}
-        </span>
-        {renderSenderBadges()}
-        <span className="text-lg">{message.emoji}</span>
-        {modMenuPosition && isMod && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold" style={{ color }}>
+            {message.display_name}
+          </span>
+          {renderSenderBadges()}
+          <button
+            onClick={(e) =>
+              setModMenuPosition((position) =>
+                position
+                  ? null
+                  : {
+                      x: Math.min(e.clientX, window.innerWidth - 210),
+                      y: Math.min(e.clientY, window.innerHeight - (isMod ? 280 : 100)),
+                    }
+              )
+            }
+            className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
+            title={isMod ? "Moderator actions & reactions" : "React to message"}
+          >
+            {isMod ? (
+              <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+            ) : (
+              <Smile className="w-3.5 h-3.5 text-muted-foreground" />
+            )}
+          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default">
+                {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {new Date(message.created_at).toLocaleTimeString()}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
+        <div className="text-lg py-0.5">{message.emoji}</div>
+        {renderReactions()}
+
+        {modMenuPosition && (
           <ModMenu
             position={modMenuPosition}
             isOwn={isOwn}
             isActing={isActing}
+            currentMember={currentMember}
+            reactions={message.reactions}
+            onReact={handleToggleReaction}
             onDelete={handleMuteMessage}
             onTimeout={handleTimeout}
           />
@@ -208,7 +305,7 @@ export default function ChatMessageRow({
 
   return (
     <div
-      onContextMenu={openModMenu}
+      onContextMenu={openContextMenu}
       className="message-appear group relative flex flex-col gap-0.5 px-2 py-1 rounded-lg hover:bg-white/3 transition-colors"
     >
       <div className="flex items-center gap-2">
@@ -216,23 +313,26 @@ export default function ChatMessageRow({
           {message.display_name}
         </span>
         {renderSenderBadges()}
-        {isMod && (
-          <button
-            onClick={(e) =>
-              setModMenuPosition((position) =>
-                position
-                  ? null
-                  : {
-                      x: Math.min(e.clientX, window.innerWidth - 190),
-                      y: Math.min(e.clientY, window.innerHeight - 260),
-                    }
-              )
-            }
-            className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
-          >
+        <button
+          onClick={(e) =>
+            setModMenuPosition((position) =>
+              position
+                ? null
+                : {
+                    x: Math.min(e.clientX, window.innerWidth - 210),
+                    y: Math.min(e.clientY, window.innerHeight - (isMod ? 280 : 100)),
+                  }
+            )
+          }
+          className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
+          title={isMod ? "Moderator actions & reactions" : "React to message"}
+        >
+          {isMod ? (
             <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-        )}
+          ) : (
+            <Smile className="w-3.5 h-3.5 text-muted-foreground" />
+          )}
+        </button>
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default">
@@ -249,12 +349,16 @@ export default function ChatMessageRow({
         {message.content}
       </p>
 
-      {/* Moderator dropdown */}
-      {modMenuPosition && isMod && (
+      {renderReactions()}
+
+      {modMenuPosition && (
         <ModMenu
           position={modMenuPosition}
           isOwn={isOwn}
           isActing={isActing}
+          currentMember={currentMember}
+          reactions={message.reactions}
+          onReact={handleToggleReaction}
           onDelete={handleMuteMessage}
           onTimeout={handleTimeout}
         />
@@ -267,45 +371,81 @@ function ModMenu({
   position,
   isOwn,
   isActing,
+  currentMember,
+  reactions,
+  onReact,
   onDelete,
   onTimeout,
 }: {
   position: { x: number; y: number }
   isOwn: boolean
   isActing: boolean
+  currentMember: Member
+  reactions: Record<string, string[]> | null
+  onReact: (emoji: string) => void
   onDelete: () => void
   onTimeout: (minutes: number | null) => void
 }) {
+  const REACTION_EMOJIS = ['❤️', '👏', '🔥', '🎹', '👍', '😂']
+  const isMod = currentMember.is_moderator
+
   return (
     <div
-      className="mod-menu-container fixed z-50 bg-popover rounded-xl shadow-2xl p-1 min-w-[178px] border border-border"
+      className="mod-menu-container fixed z-50 bg-popover rounded-xl shadow-2xl p-1 min-w-[200px] border border-border flex flex-col gap-1"
       style={{ left: position.x, top: position.y }}
     >
       <p className="text-[10px] text-muted-foreground px-2 py-1 tracking-widest uppercase">
-        Mod Actions
+        Reactions
       </p>
-      <button
-        onClick={onDelete}
-        disabled={isActing}
-        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-destructive/15 rounded-lg transition-colors text-left text-destructive/90"
-      >
-        <Trash2 className="w-3 h-3" />
-        Delete chat
-      </button>
-      {!isOwn && (
+      {/* Quick reaction emojis grid */}
+      <div className="grid grid-cols-6 gap-1 px-1 py-0.5">
+        {REACTION_EMOJIS.map((emoji) => {
+          const hasReacted = reactions?.[emoji]?.includes(currentMember.id)
+          return (
+            <button
+              key={emoji}
+              onClick={() => onReact(emoji)}
+              disabled={isActing}
+              className={`text-lg p-1 rounded-lg transition-all hover:scale-125 ${
+                hasReacted ? 'bg-[oklch(0.75_0.12_85)/20] scale-110' : 'hover:bg-white/5'
+              }`}
+            >
+              {emoji}
+            </button>
+          )
+        })}
+      </div>
+
+      {isMod && (
         <>
           <div className="my-1 border-t border-white/10" />
-          {TIMEOUT_OPTIONS.map((opt) => (
-            <button
-              key={opt.label}
-              onClick={() => onTimeout(opt.minutes)}
-              disabled={isActing}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-destructive/20 rounded-lg transition-colors text-left text-destructive/80"
-            >
-              <Clock className="w-3 h-3" />
-              Timeout {opt.label}
-            </button>
-          ))}
+          <p className="text-[10px] text-muted-foreground px-2 py-1 tracking-widest uppercase">
+            Mod Actions
+          </p>
+          <button
+            onClick={onDelete}
+            disabled={isActing}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-destructive/15 rounded-lg transition-colors text-left text-destructive/90"
+          >
+            <Trash2 className="w-3 h-3" />
+            Delete chat
+          </button>
+          {!isOwn && (
+            <>
+              <div className="my-1 border-t border-white/10" />
+              {TIMEOUT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.label}
+                  onClick={() => onTimeout(opt.minutes)}
+                  disabled={isActing}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-destructive/20 rounded-lg transition-colors text-left text-destructive/80"
+                >
+                  <Clock className="w-3 h-3" />
+                  Timeout {opt.label}
+                </button>
+              ))}
+            </>
+          )}
         </>
       )}
     </div>

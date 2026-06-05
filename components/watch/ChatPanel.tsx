@@ -93,6 +93,14 @@ export default function ChatPanel({
           setIsMuted(true)
         }
       })
+      .on('broadcast', { event: 'message_reaction' }, ({ payload }) => {
+        const { message_id, reactions } = payload as { message_id: string; reactions: Record<string, string[]> }
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === message_id ? { ...msg, reactions } : msg
+          )
+        )
+      })
       .on('broadcast', { event: 'tip_received' }, ({ payload }) => {
         onTipBanner(payload as { name: string; amount: number; message?: string })
       })
@@ -260,6 +268,13 @@ export default function ChatPanel({
                 onDeleted={(messageId) =>
                   setMessages((prev) => prev.filter((message) => message.id !== messageId))
                 }
+                onReacted={(messageId, reactions) => {
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === messageId ? { ...msg, reactions } : msg
+                    )
+                  )
+                }}
               />
             )
           })()

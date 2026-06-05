@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS vip_livestream.chat_messages (
   content text,
   emoji text,
   is_muted boolean NOT NULL DEFAULT false,
+  reactions jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT content_or_emoji CHECK (content IS NOT NULL OR emoji IS NOT NULL)
 );

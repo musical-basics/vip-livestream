@@ -86,6 +86,7 @@ export interface Database {
           emoji: string | null
           is_muted: boolean
           created_at: string
+          reactions: Record<string, string[]> | null
         }
         Insert: {
           id?: string
@@ -96,6 +97,7 @@ export interface Database {
           emoji?: string | null
           is_muted?: boolean
           created_at?: string
+          reactions?: Record<string, string[]> | null
         }
         Update: {
           id?: string
@@ -106,6 +108,7 @@ export interface Database {
           emoji?: string | null
           is_muted?: boolean
           created_at?: string
+          reactions?: Record<string, string[]> | null
         }
       }
       member_timeouts: {
