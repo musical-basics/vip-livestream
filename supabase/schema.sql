@@ -81,6 +81,12 @@ CREATE TABLE IF NOT EXISTS vip_livestream.streams (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE vip_livestream.streams
+  ADD COLUMN IF NOT EXISTS slow_mode_delay integer NOT NULL DEFAULT 0;
+
+ALTER TABLE vip_livestream.streams
+  ADD COLUMN IF NOT EXISTS pinned_message jsonb;
+
 -- 3. Chat messages table
 CREATE TABLE IF NOT EXISTS vip_livestream.chat_messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

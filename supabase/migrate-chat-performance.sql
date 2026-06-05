@@ -4,6 +4,10 @@
 -- Safe to re-run (idempotent).
 -- ============================================================
 
+-- Required by moderator slow mode on existing databases.
+ALTER TABLE vip_livestream.streams
+  ADD COLUMN IF NOT EXISTS slow_mode_delay integer NOT NULL DEFAULT 0;
+
 -- Keeps the per-member send throttle fast as chat history grows.
 CREATE INDEX IF NOT EXISTS idx_chat_messages_member_stream_created
   ON vip_livestream.chat_messages(member_id, stream_id, created_at DESC);
