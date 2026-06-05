@@ -27,6 +27,7 @@ import {
   Settings,
   ArrowLeft,
   Archive,
+  RefreshCw,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
@@ -119,6 +120,28 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
       )
     }
     setLoadingId(null)
+  }
+
+  async function forceRefreshViewers(streamId: string) {
+    setLoadingId(`refresh-${streamId}`)
+    try {
+      const res = await fetch('/api/admin/stream', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stream_id: streamId,
+          force_refresh: true,
+        }),
+      })
+      if (!res.ok) {
+        alert('Failed to send refresh signal.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('An error occurred while trying to send the refresh signal.')
+    } finally {
+      setLoadingId(null)
+    }
   }
 
   async function toggleModerator(member: Member) {
@@ -392,29 +415,47 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                       )}
                     </div>
 
-                    {/* Go Live / End Stream button */}
-                    <Button
-                      onClick={() => toggleLive(stream)}
-                      disabled={loadingId === stream.id}
-                      size="sm"
-                      className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl sm:w-auto"
-                      style={stream.is_live ? {
-                        background: 'oklch(0.20 0.02 270)',
-                        border: '1px solid oklch(0.65 0.22 25 / 0.4)',
-                        color: 'oklch(0.65 0.22 25)',
-                      } : {
-                        background: 'linear-gradient(135deg, oklch(0.60 0.22 25), oklch(0.45 0.18 10))',
-                        color: 'white',
-                      }}
-                    >
-                      {loadingId === stream.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : stream.is_live ? (
-                        <><PowerOff className="w-3.5 h-3.5" /> End Stream</>
-                      ) : (
-                        <><Power className="w-3.5 h-3.5" /> Go Live</>
+                    {/* Go Live / End Stream / Refresh buttons */}
+                    <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+                      {stream.is_live && (
+                        <Button
+                          onClick={() => forceRefreshViewers(stream.id)}
+                          disabled={loadingId === `refresh-${stream.id}`}
+                          size="sm"
+                          variant="outline"
+                          className="flex items-center justify-center gap-2 rounded-xl border border-white/10 hover:bg-white/5"
+                        >
+                          {loadingId === `refresh-${stream.id}` ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3.5 h-3.5 text-[oklch(0.75_0.12_85)]" />
+                          )}
+                          Sync & Refresh Viewers
+                        </Button>
                       )}
-                    </Button>
+                      <Button
+                        onClick={() => toggleLive(stream)}
+                        disabled={loadingId === stream.id}
+                        size="sm"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl sm:w-auto"
+                        style={stream.is_live ? {
+                          background: 'oklch(0.20 0.02 270)',
+                          border: '1px solid oklch(0.65 0.22 25 / 0.4)',
+                          color: 'oklch(0.65 0.22 25)',
+                        } : {
+                          background: 'linear-gradient(135deg, oklch(0.60 0.22 25), oklch(0.45 0.18 10))',
+                          color: 'white',
+                        }}
+                      >
+                        {loadingId === stream.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : stream.is_live ? (
+                          <><PowerOff className="w-3.5 h-3.5" /> End Stream</>
+                        ) : (
+                          <><Power className="w-3.5 h-3.5" /> Go Live</>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}

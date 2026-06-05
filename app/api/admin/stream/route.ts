@@ -50,16 +50,34 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ stream })
 }
 
-// PATCH — update stream (go live, end stream, update details)
+// PATCH — update stream (go live, end stream, update details, or manual refresh broadcast)
 export async function PATCH(request: NextRequest) {
   const member = await getSession()
   if (!isAdmin(member)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { stream_id, is_live, stream_start_utc, youtube_video_id, title, setlist } = await request.json()
+  const { stream_id, is_live, stream_start_utc, youtube_video_id, title, setlist, force_refresh } = await request.json()
 
   if (!stream_id) return NextResponse.json({ error: 'stream_id required' }, { status: 400 })
 
   const supabase = createServiceClient()
+
+  // Handle manual "Force Refresh Viewers"
+  if (force_refresh === true) {
+    const { data: stream, error } = await supabase
+      .from('streams')
+      .select('*')
+      .eq('id', stream_id)
+      .single()
+
+    if (error || !stream) {
+      return NextResponse.json({ error: 'Stream not found' }, { status: 404 })
+    }
+
+    // Broadcast stream_updated to trigger all connected clients to reload/refresh page data
+    await broadcastStreamStatus(stream_id, stream.is_live, 'stream_updated')
+    return NextResponse.json({ ok: true, stream })
+  }
+
   const update: {
     is_live?: boolean
     stream_start_utc?: string | null

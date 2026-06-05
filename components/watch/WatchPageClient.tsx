@@ -24,6 +24,8 @@ const DEFAULT_CHAT_WIDTH = 400
 const MIN_VIDEO_HEIGHT = 220
 const MIN_BOTTOM_HEIGHT = 160
 const DEFAULT_VIDEO_HEIGHT = 360
+const STREAM_SYNC_POLL_MS = 5 * 60 * 1000
+const STREAM_REFRESH_DEBOUNCE_MS = 1000
 
 // ── Types ─────────────────────────────────────────────────────
 interface WatchPageClientProps {
@@ -130,6 +132,7 @@ export default function WatchPageClient({
   const leftColumnRef = useRef<HTMLDivElement>(null)
   const videoWrapRef  = useRef<HTMLDivElement>(null)
   const hasResizedVideoRef = useRef(false)
+  const refreshTimerRef = useRef<number | null>(null)
   const dragStateRef  = useRef<{
     mode: ResizeMode
     startX: number
@@ -210,9 +213,9 @@ export default function WatchPageClient({
     }
   }, [getMaxChatWidth, getMaxVideoHeight])
 
-  const startResize = useCallback((mode: ResizeMode, e: ReactPointerEvent) => {
-    if (!isDesktop) return
-    e.preventDefault()
+	  const startResize = useCallback((mode: ResizeMode, e: ReactPointerEvent) => {
+	    if (!isDesktop) return
+	    e.preventDefault()
     dragStateRef.current = {
       mode,
       startX: e.clientX,
@@ -223,41 +226,57 @@ export default function WatchPageClient({
     if (mode === 'bottom') hasResizedVideoRef.current = true
     setResizeMode(mode)
     document.body.style.cursor = mode === 'chat' ? 'col-resize' : 'row-resize'
-    document.body.style.userSelect = 'none'
-  }, [chatWidth, isDesktop, videoHeight])
+	    document.body.style.userSelect = 'none'
+	  }, [chatWidth, isDesktop, videoHeight])
 
-  // Auto-refresh when the active stream, live state, or YouTube link changes.
-  useEffect(() => {
-    const supabase = createClient()
-    const refresh = () => { router.refresh() }
-    const statusChannel = supabase
-      .channel('stream-status')
-      .on('broadcast', { event: 'stream_live' }, refresh)
-      .on('broadcast', { event: 'stream_ended' }, refresh)
-      .on('broadcast', { event: 'stream_updated' }, refresh)
-      .subscribe()
-    const currentStreamChannel = stream?.id
-      ? supabase
-          .channel(`stream:${stream.id}`)
-          .on('broadcast', { event: 'stream_live' }, refresh)
-          .on('broadcast', { event: 'stream_ended' }, refresh)
-          .on('broadcast', { event: 'stream_updated' }, refresh)
-          .subscribe()
-      : null
+  const refreshWatchPage = useCallback(() => {
+    if (refreshTimerRef.current !== null) return
+
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null
+      router.refresh()
+    }, STREAM_REFRESH_DEBOUNCE_MS)
+  }, [router])
+
+  useEffect(() => () => {
+    if (refreshTimerRef.current !== null) {
+      window.clearTimeout(refreshTimerRef.current)
+    }
+  }, [])
+
+	  // Auto-refresh when the active stream, live state, or YouTube link changes.
+	  useEffect(() => {
+	    const supabase = createClient()
+	    const statusChannel = supabase
+	      .channel('stream-status')
+	      .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
+	      .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
+	      .on('broadcast', { event: 'stream_updated' }, refreshWatchPage)
+	      .subscribe()
+	    const currentStreamChannel = stream?.id
+	      ? supabase
+	          .channel(`stream:${stream.id}`)
+	          .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
+	          .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
+	          .on('broadcast', { event: 'stream_updated' }, refreshWatchPage)
+	          .subscribe()
+	      : null
 
     return () => {
-      supabase.removeChannel(statusChannel)
-      if (currentStreamChannel) supabase.removeChannel(currentStreamChannel)
-    }
-  }, [stream?.id, router])
+	      supabase.removeChannel(statusChannel)
+	      if (currentStreamChannel) supabase.removeChannel(currentStreamChannel)
+	    }
+	  }, [stream?.id, refreshWatchPage])
 
-  // Realtime can be missed if a tab sleeps. Poll lightly as a safety net.
-  useEffect(() => {
-    let isDisposed = false
-    const checkForStreamChange = async () => {
-      try {
-        const res = await fetch('/api/stream/sync', { cache: 'no-store' })
-        if (!res.ok || isDisposed) return
+	  // Realtime can be missed if a tab sleeps. Poll lightly as a safety net.
+	  useEffect(() => {
+	    let isDisposed = false
+	    const checkForStreamChange = async (force = false) => {
+	      if (!force && document.visibilityState !== 'visible') return
+
+	      try {
+	        const res = await fetch('/api/stream/sync', { cache: 'no-store' })
+	        if (!res.ok || isDisposed) return
 
         const data = await res.json() as {
           is_live?: boolean
@@ -269,22 +288,30 @@ export default function WatchPageClient({
           data.is_live === true &&
           (data.stream_id !== stream?.id || data.youtube_video_id !== stream?.youtube_video_id)
         const activeStreamEnded = !!stream?.is_live && data.is_live === false
-        const streamCameOnline = !stream?.is_live && data.is_live === true
+	        const streamCameOnline = !stream?.is_live && data.is_live === true
 
-        if (activeStreamChanged || activeStreamEnded || streamCameOnline) {
-          router.refresh()
-        }
-      } catch {
-        // The next interval will try again.
-      }
-    }
+	        if (activeStreamChanged || activeStreamEnded || streamCameOnline) {
+	          refreshWatchPage()
+	        }
+	      } catch {
+	        // The next interval will try again.
+	      }
+	    }
 
-    const interval = window.setInterval(checkForStreamChange, 60000)
-    return () => {
-      isDisposed = true
-      window.clearInterval(interval)
-    }
-  }, [stream?.id, stream?.is_live, stream?.youtube_video_id, router])
+	    const handleVisibilityChange = () => {
+	      if (document.visibilityState === 'visible') {
+	        void checkForStreamChange(true)
+	      }
+	    }
+
+	    const interval = window.setInterval(checkForStreamChange, STREAM_SYNC_POLL_MS)
+	    document.addEventListener('visibilitychange', handleVisibilityChange)
+	    return () => {
+	      isDisposed = true
+	      window.clearInterval(interval)
+	      document.removeEventListener('visibilitychange', handleVisibilityChange)
+	    }
+	  }, [stream?.id, stream?.is_live, stream?.youtube_video_id, refreshWatchPage])
 
   // Show tip success notification
   useEffect(() => {
