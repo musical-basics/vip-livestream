@@ -8,12 +8,16 @@ import {
   SETLIST_SLUGS,
   PROGRAMME_SLUG,
 } from '@/lib/setlist-store'
+import { SETLIST_API_DOCS } from '@/lib/setlist-api-docs'
 
 /**
  * GET /api/agent/setlist
- *   List every stored setlist document (slug + data + timestamps).
+ *   List every stored setlist document (slug + data + timestamps), with the
+ *   full usage instructions in `instructions` so an agent can self-serve.
  * GET /api/agent/setlist?slug=programme
  *   Return one stored document, or 404 if none exists (code default is in use).
+ *
+ * The same instructions are mirrored in docs/agent-setlist-api.md.
  */
 export async function GET(request: NextRequest) {
   if (!verifyAgentKey(request)) return agentUnauthorized()
@@ -24,7 +28,11 @@ export async function GET(request: NextRequest) {
     const data = await getStoredSetlist(slug)
     if (data === null) {
       return Response.json(
-        { error: 'No stored setlist for this slug; the code default is in use.', slug },
+        {
+          error: 'No stored setlist for this slug; the code default is in use.',
+          slug,
+          instructions: SETLIST_API_DOCS,
+        },
         { status: 404 }
       )
     }
@@ -33,7 +41,11 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await listSetlists()
   if (error) return Response.json({ error: error.message }, { status: 500 })
-  return Response.json({ slugs: SETLIST_SLUGS, setlists: data ?? [] })
+  return Response.json({
+    slugs: SETLIST_SLUGS,
+    setlists: data ?? [],
+    instructions: SETLIST_API_DOCS,
+  })
 }
 
 /**
@@ -50,23 +62,35 @@ export async function PUT(request: NextRequest) {
   try {
     body = await request.json()
   } catch {
-    return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return Response.json(
+      { error: 'Invalid JSON body', instructions: SETLIST_API_DOCS },
+      { status: 400 }
+    )
   }
 
   const { slug, data } = (body ?? {}) as { slug?: unknown; data?: unknown }
 
   if (typeof slug !== 'string' || !slug.trim()) {
-    return Response.json({ error: 'slug (string) is required' }, { status: 400 })
+    return Response.json(
+      { error: 'slug (string) is required', instructions: SETLIST_API_DOCS },
+      { status: 400 }
+    )
   }
   if (data === undefined || data === null) {
-    return Response.json({ error: 'data is required' }, { status: 400 })
+    return Response.json(
+      { error: 'data is required', instructions: SETLIST_API_DOCS },
+      { status: 400 }
+    )
   }
 
   // The viewer programme must be a non-empty array of pieces, otherwise /watch
   // would silently fall back to the code default and the write would look lost.
   if (slug === PROGRAMME_SLUG && (!Array.isArray(data) || data.length === 0)) {
     return Response.json(
-      { error: `data for slug '${PROGRAMME_SLUG}' must be a non-empty array of setlist items` },
+      {
+        error: `data for slug '${PROGRAMME_SLUG}' must be a non-empty array of setlist items`,
+        instructions: SETLIST_API_DOCS,
+      },
       { status: 400 }
     )
   }
@@ -101,7 +125,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   if (!slug.trim()) {
-    return Response.json({ error: 'slug is required' }, { status: 400 })
+    return Response.json(
+      { error: 'slug is required', instructions: SETLIST_API_DOCS },
+      { status: 400 }
+    )
   }
 
   const { error } = await deleteSetlist(slug.trim())
