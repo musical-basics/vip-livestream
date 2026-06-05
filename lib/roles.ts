@@ -66,8 +66,9 @@ export function roleBadge(member: RoleFlags | null | undefined) {
  * private student emerald, DreamPlay violet). So a name always reinforces the
  * badge shown beside it.
  */
-export function nameColor(role: RoleName | null, accessBadges: unknown): string {
+export function nameColor(role: RoleName | null, accessBadges: unknown, customColor?: string | null): string {
   if (role) return ROLE_BADGE[role].color
+  if (customColor) return customColor
   const primary = getMemberBadge(normalizeMemberBadges(accessBadges)[0])
   return primary?.color ?? 'oklch(0.85 0.16 90)'
 }

@@ -17,6 +17,7 @@ interface ChatMessageRowProps {
   currentMember: Member
   senderBadges?: string[]
   senderRole: 'ADMIN' | 'MOD' | null
+  senderColor?: string | null
   isMuted: boolean
   isPinned: boolean
   streamId: string | undefined
@@ -39,6 +40,7 @@ function ChatMessageRow({
   currentMember,
   senderBadges,
   senderRole,
+  senderColor,
   isMuted,
   isPinned,
   streamId,
@@ -53,7 +55,7 @@ function ChatMessageRow({
 
   const isMod = canModerateChat(currentMember)
   const isOwn = message.member_id === currentMember.id
-  const color = nameColor(senderRole, senderBadges)
+  const color = nameColor(senderRole, senderBadges, senderColor)
   const visibleBadges = normalizeMemberBadges(senderBadges)
 
   const relativeTime = useRelativeTime(message.created_at)

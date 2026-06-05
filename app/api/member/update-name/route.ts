@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   const member = await getSession()
   if (!member) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { display_name } = await request.json()
+  const { display_name, name_color } = await request.json()
   if (!display_name?.trim()) {
     return NextResponse.json({ error: 'Name required' }, { status: 400 })
   }
@@ -14,7 +14,10 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceClient()
   const { error } = await supabase
     .from('members')
-    .update({ display_name: display_name.trim() })
+    .update({ 
+      display_name: display_name.trim(),
+      name_color: name_color || null
+    })
     .eq('id', member.id)
 
   if (error) return NextResponse.json({ error: 'Failed to update' }, { status: 500 })

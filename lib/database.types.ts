@@ -21,6 +21,7 @@ export interface Database {
           is_admin: boolean
           is_banned: boolean
           created_at: string
+          name_color: string | null
         }
         Insert: {
           id?: string
@@ -33,6 +34,7 @@ export interface Database {
           is_admin?: boolean
           is_banned?: boolean
           created_at?: string
+          name_color?: string | null
         }
         Update: {
           id?: string
@@ -45,6 +47,7 @@ export interface Database {
           is_admin?: boolean
           is_banned?: boolean
           created_at?: string
+          name_color?: string | null
         }
       }
       streams: {

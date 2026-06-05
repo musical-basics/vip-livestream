@@ -160,6 +160,7 @@ export default function ChatPanel({
   const [hasMore, setHasMore] = useState(initialMessages.length >= PAGE_SIZE)
   const [onlineCount, setOnlineCount] = useState(1)
   const [displayName, setDisplayName] = useState(member.display_name || member.name)
+  const [memberNameColor, setMemberNameColor] = useState(member.name_color)
   const [mutedMessageIds, setMutedMessageIds] = useState<Set<string>>(new Set())
   const [chatFloatingEmojis, setChatFloatingEmojis] = useState<Array<{ id: string; emoji: string; x: number; delay: number }>>([])
   const [pinnedMessage, setPinnedMessage] = useState<ChatMessage | null>(
@@ -240,9 +241,9 @@ export default function ChatPanel({
   const supabase = useMemo(() => createClient(), [])
   const memberById = useMemo(() => {
     const map = new Map(memberDirectory.map((directoryMember) => [directoryMember.id, directoryMember]))
-    map.set(member.id, member)
+    map.set(member.id, { ...member, display_name: displayName, name_color: memberNameColor })
     return map
-  }, [memberDirectory, member])
+  }, [memberDirectory, member, displayName, memberNameColor])
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual manages mutable measurements internally.
   const virtualizer = useVirtualizer({
@@ -643,6 +644,8 @@ export default function ChatPanel({
           displayName={displayName}
           onChange={setDisplayName}
           highlight={highlightNameEditor}
+          nameColor={memberNameColor}
+          onColorChange={setMemberNameColor}
         />
         <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
           {canModerateChat(member) && (
@@ -743,6 +746,7 @@ export default function ChatPanel({
                     currentMember={member}
                     senderBadges={sender?.access_badges}
                     senderRole={roleLabel(sender)}
+                    senderColor={sender?.name_color}
                     isMuted={mutedMessageIds.has(msg.id)}
                     streamId={streamId}
                     onDeleted={handleMessageDeleted}
