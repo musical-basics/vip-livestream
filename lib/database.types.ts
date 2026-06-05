@@ -207,6 +207,14 @@ export type MemberTimeout = Database['vip_livestream']['Tables']['member_timeout
 export type Comment = Database['vip_livestream']['Tables']['comments']['Row']
 export type Tip = Database['vip_livestream']['Tables']['tips']['Row']
 
+/**
+ * Arrangement category for a setlist piece, surfaced as a badge on the
+ * programme. Mirrors the Belgium concert planning sheet: solo piano, an EDM
+ * arrangement (solo piano with electronic backing track), the piano trio
+ * (violin + cello), or the violin + piano duet.
+ */
+export type SetlistCategory = 'solo' | 'edm' | 'trio' | 'duet'
+
 export interface SetlistItem {
   id: string
   piece: string
@@ -215,4 +223,5 @@ export interface SetlistItem {
   performer: string
   duration?: string
   notes?: string
+  category?: SetlistCategory
 }

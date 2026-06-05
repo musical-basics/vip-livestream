@@ -8,6 +8,10 @@ import type { SetlistItem } from '@/lib/database.types'
  * null or empty renders this list. A stream can still override it by setting
  * its own non-empty `setlist` in the DB (admin UI or PATCH /api/agent/stream).
  *
+ * Each piece carries a `category` (solo, edm, trio, or duet) so the programme
+ * can badge how it is performed. For the full production planning detail, see
+ * the Belgium concert tracker on /setlist.
+ *
  * Belgium Concert, Theaterzaal Maupertuis, CC De Factorij, Zaventem, 11 June 2026.
  */
 export const DEFAULT_SETLIST: SetlistItem[] = [
@@ -19,6 +23,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~4 min',
     notes: 'Opener. Solo piano.',
+    category: 'solo',
   },
   {
     id: '2',
@@ -27,6 +32,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~4 min',
     notes: 'Original work for solo piano.',
+    category: 'solo',
   },
   {
     id: '3',
@@ -35,6 +41,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu, with violin & cello (trio)',
     duration: '~5 min',
     notes: 'Trio arrangement.',
+    category: 'trio',
   },
   {
     id: '4',
@@ -44,6 +51,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~2.5 min',
     notes: 'Solo piano.',
+    category: 'solo',
   },
   {
     id: '4n',
@@ -52,6 +60,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~4 min',
     notes: "'Nightmare' arrangement. Solo piano with electronic backing.",
+    category: 'edm',
   },
   {
     id: '5',
@@ -60,6 +69,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu, with violin & cello (trio)',
     duration: '~4.5 min',
     notes: 'Trio arrangement.',
+    category: 'trio',
   },
   {
     id: '6',
@@ -69,6 +79,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~4.5 min',
     notes: 'Electronic arrangement. Solo piano with backing track.',
+    category: 'edm',
   },
   {
     id: '7',
@@ -77,6 +88,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~5 min',
     notes: 'Original work for solo piano.',
+    category: 'solo',
   },
   {
     id: '8',
@@ -86,6 +98,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~4 min',
     notes: 'Solo piano.',
+    category: 'solo',
   },
   {
     id: '9',
@@ -95,6 +108,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~6 min',
     notes: "'Nightmare' arrangement. Solo piano with electronic backing.",
+    category: 'edm',
   },
   {
     id: '10',
@@ -103,6 +117,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~5 min',
     notes: 'Original work for solo piano.',
+    category: 'solo',
   },
   {
     id: '11',
@@ -111,6 +126,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu, with violin (duet)',
     duration: '~5 min',
     notes: 'Violin and piano duet.',
+    category: 'duet',
   },
   {
     id: '12',
@@ -120,6 +136,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~5 min',
     notes: 'Dubstep arrangement. Solo piano with electronic backing.',
+    category: 'edm',
   },
   {
     id: 'e1',
@@ -129,6 +146,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~5 min',
     notes: 'Encore. Op. 66, solo piano.',
+    category: 'solo',
   },
   {
     id: 'e2',
@@ -138,6 +156,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~2 min',
     notes: 'Encore. Solo piano.',
+    category: 'solo',
   },
   {
     id: 'e3',
@@ -146,5 +165,6 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
     performer: 'Lionel Yu',
     duration: '~3.5 min',
     notes: 'Encore. Electronic arrangement. Solo piano with backing track.',
+    category: 'edm',
   },
 ]

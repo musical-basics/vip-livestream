@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, Music2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { DEFAULT_SETLIST } from '@/lib/default-setlist'
+import { CATEGORY_META } from '@/lib/setlist-category'
 
 interface SetlistPanelProps {
   stream: Stream | null
@@ -61,6 +62,14 @@ export default function SetlistPanel({ stream }: SetlistPanelProps) {
                   <span className="text-xs opacity-60 ml-1">({item.composerYears})</span>
                 )}
               </p>
+              {item.category && (
+                <Badge
+                  variant="outline"
+                  className={`mt-1.5 text-[10px] tracking-wide ${CATEGORY_META[item.category].className}`}
+                >
+                  {CATEGORY_META[item.category].label}
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {item.duration && (
