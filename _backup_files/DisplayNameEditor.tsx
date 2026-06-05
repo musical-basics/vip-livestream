@@ -71,9 +71,8 @@ export default function DisplayNameEditor({
 
   if (isEditing) {
     return (
-      <div className="flex flex-col gap-2.5 p-2.5 bg-black/95 border border-white/10 rounded-xl w-[200px] z-50 shadow-2xl backdrop-blur-md">
-        <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wider font-semibold select-none">Display Name</span>
+      <div className="flex flex-col gap-2 p-2 bg-black/45 border border-white/10 rounded-xl max-w-[200px] z-50">
+        <div className="flex items-center gap-1.5">
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -83,8 +82,19 @@ export default function DisplayNameEditor({
               if (e.key === 'Enter') save()
               if (e.key === 'Escape') cancel()
             }}
-            className="text-xs bg-white/5 border border-[oklch(0.75_0.12_85)/30] rounded-lg px-2.5 py-1.5 focus:outline-none w-full focus:border-[oklch(0.75_0.12_85)] transition-colors"
+            className="text-xs bg-white/5 border border-[oklch(0.75_0.12_85)/50] rounded px-2 py-1 focus:outline-none flex-1"
           />
+          <button
+            onClick={save}
+            disabled={isSaving}
+            className="text-[oklch(0.75_0.12_85)] hover:opacity-80"
+            title="Save changes"
+          >
+            <Check className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={cancel} className="text-muted-foreground hover:opacity-80" title="Cancel">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
         
         {/* Name color selection */}
@@ -120,27 +130,6 @@ export default function DisplayNameEditor({
               )
             })}
           </div>
-        </div>
-
-        <div className="flex gap-1.5 mt-1">
-          <button
-            type="button"
-            onClick={save}
-            disabled={isSaving}
-            className="flex-1 text-[11px] font-semibold py-1 px-3 rounded-lg text-[oklch(0.09_0.015_270)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-            style={{
-              background: 'linear-gradient(135deg, oklch(0.75 0.12 85), oklch(0.60 0.10 70))',
-            }}
-          >
-            {isSaving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            type="button"
-            onClick={cancel}
-            className="text-[11px] font-medium py-1 px-2.5 rounded-lg border border-white/15 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all"
-          >
-            Cancel
-          </button>
         </div>
       </div>
     )
