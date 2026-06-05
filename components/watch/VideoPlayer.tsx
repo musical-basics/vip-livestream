@@ -22,6 +22,7 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [playerState, setPlayerState] = useState<'loading' | 'ready' | 'offline'>('loading')
   const [isPlaying, setIsPlaying] = useState(false)
+  const hasLiveVideo = !!stream?.is_live && !!stream.youtube_video_id
 
   const syncPlayer = useCallback(async () => {
     if (!playerRef.current || !stream?.is_live) return
@@ -110,8 +111,8 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
   }, [isPlaying, playerState])
 
   useEffect(() => {
-    if (!stream?.youtube_video_id) {
-      setPlayerState('offline')
+    if (!hasLiveVideo) {
+      setPlayerState('loading')
       setIsPlaying(false)
       return
     }
@@ -137,9 +138,9 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current)
       if (playerRef.current?.destroy) playerRef.current.destroy()
     }
-  }, [initPlayer, stream?.youtube_video_id])
+  }, [hasLiveVideo, initPlayer, stream?.youtube_video_id])
 
-  if (!stream || !stream.youtube_video_id) {
+  if (!hasLiveVideo) {
     return (
       <div className={`${fill ? 'h-full' : 'aspect-video'} w-full bg-[oklch(0.08_0.01_270)] flex flex-col items-center justify-center gap-4`}>
         <Clock className="w-12 h-12 text-muted-foreground opacity-30" />

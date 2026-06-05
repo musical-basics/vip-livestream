@@ -214,7 +214,6 @@ export default function WatchPageClient({
 
   // Auto-refresh when the active stream, live state, or YouTube link changes.
   useEffect(() => {
-    if (!stream?.id) return
     const supabase = createClient()
     const refresh = () => { router.refresh() }
     const statusChannel = supabase
@@ -223,23 +222,23 @@ export default function WatchPageClient({
       .on('broadcast', { event: 'stream_ended' }, refresh)
       .on('broadcast', { event: 'stream_updated' }, refresh)
       .subscribe()
-    const currentStreamChannel = supabase
-      .channel(`stream:${stream.id}`)
-      .on('broadcast', { event: 'stream_live' }, refresh)
-      .on('broadcast', { event: 'stream_ended' }, refresh)
-      .on('broadcast', { event: 'stream_updated' }, refresh)
-      .subscribe()
+    const currentStreamChannel = stream?.id
+      ? supabase
+          .channel(`stream:${stream.id}`)
+          .on('broadcast', { event: 'stream_live' }, refresh)
+          .on('broadcast', { event: 'stream_ended' }, refresh)
+          .on('broadcast', { event: 'stream_updated' }, refresh)
+          .subscribe()
+      : null
 
     return () => {
       supabase.removeChannel(statusChannel)
-      supabase.removeChannel(currentStreamChannel)
+      if (currentStreamChannel) supabase.removeChannel(currentStreamChannel)
     }
   }, [stream?.id, router])
 
   // Realtime can be missed if a tab sleeps. Poll lightly as a safety net.
   useEffect(() => {
-    if (!stream?.id) return
-
     let isDisposed = false
     const checkForStreamChange = async () => {
       try {
@@ -254,9 +253,9 @@ export default function WatchPageClient({
 
         const activeStreamChanged =
           data.is_live === true &&
-          (data.stream_id !== stream.id || data.youtube_video_id !== stream.youtube_video_id)
-        const activeStreamEnded = stream.is_live && data.is_live === false
-        const streamCameOnline = !stream.is_live && data.is_live === true
+          (data.stream_id !== stream?.id || data.youtube_video_id !== stream?.youtube_video_id)
+        const activeStreamEnded = !!stream?.is_live && data.is_live === false
+        const streamCameOnline = !stream?.is_live && data.is_live === true
 
         if (activeStreamChanged || activeStreamEnded || streamCameOnline) {
           router.refresh()
@@ -293,6 +292,27 @@ export default function WatchPageClient({
     setTimeout(() => {
       setFloatingEmojis(prev => prev.filter(e => e.id !== id))
     }, 2600)
+  }
+
+  if (!stream?.is_live) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col">
+        <Header member={member} stream={stream} />
+        {tipBanner && (
+          <TipBanner
+            name={tipBanner.name}
+            amount={tipBanner.amount}
+            message={tipBanner.message}
+            onClose={() => setTipBanner(null)}
+          />
+        )}
+        <main className="flex flex-1 items-center justify-center px-4 py-8">
+          <div className="w-full max-w-4xl">
+            <VideoPlayer stream={stream} />
+          </div>
+        </main>
+      </div>
+    )
   }
 
   return (

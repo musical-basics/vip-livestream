@@ -10,7 +10,7 @@ export default async function WatchPage() {
 
   const supabase = createServiceClient()
 
-  // Prefer an active stream. If none is live, fall back to the newest stream record.
+  // Only an active live stream belongs on /watch. Ended YouTube links live in /recordings.
   const { data: liveStream } = await supabase
     .from('streams')
     .select('*')
@@ -19,29 +19,7 @@ export default async function WatchPage() {
     .limit(1)
     .maybeSingle()
 
-  const { data: newestStream } = liveStream
-    ? { data: null }
-    : await supabase
-        .from('streams')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-  // Auto-provision a default stream if none exists yet.
-  // This ensures chat, comments, and the watch page work immediately on first visit.
-  const stream: Stream | null = liveStream ?? newestStream ?? (
-    await supabase
-      .from('streams')
-      .insert({
-        title: 'VIP Piano Livestream',
-        youtube_video_id: '',
-        is_live: false,
-        description: '',
-      })
-      .select()
-      .single()
-  ).data
+  const stream: Stream | null = liveStream ?? null
 
   // Fetch all stream-dependent data in parallel once we have a stream
   const [messagesRes, commentsRes, timeoutRes, membersRes] = stream
