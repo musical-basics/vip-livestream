@@ -34,20 +34,6 @@ const TIMEOUT_OPTIONS = [
   { label: 'Permanent', minutes: null },
 ]
 
-// Assign consistent colors to users
-function getMemberColor(memberId: string): string {
-  const colors = [
-    'oklch(0.75 0.12 85)',   // gold
-    'oklch(0.70 0.15 220)',  // blue
-    'oklch(0.72 0.14 160)',  // teal
-    'oklch(0.68 0.16 320)',  // pink
-    'oklch(0.73 0.13 270)',  // purple
-    'oklch(0.71 0.14 40)',   // orange
-  ]
-  const hash = memberId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  return colors[hash % colors.length]
-}
-
 function ChatMessageRow({
   message,
   currentMember,
@@ -67,7 +53,7 @@ function ChatMessageRow({
 
   const isMod = canModerateChat(currentMember)
   const isOwn = message.member_id === currentMember.id
-  const color = getMemberColor(message.member_id)
+  const color = nameColor(senderRole, senderBadges)
   const visibleBadges = normalizeMemberBadges(senderBadges)
 
   function openContextMenu(e: React.MouseEvent) {
