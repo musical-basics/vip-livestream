@@ -2,12 +2,19 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import LoginForm from '@/components/LoginForm'
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ email?: string; pw?: string }>
+}) {
   // Already logged in
   const session = await getSession()
   if (session) {
     redirect('/watch')
   }
+
+  // Direct-link credentials (e.g. from the invitation email): ?email=...&pw=...
+  const { email, pw } = await searchParams
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center px-4 py-6 sm:p-4">
@@ -55,7 +62,7 @@ export default async function HomePage() {
 
         {/* Login card */}
         <div className="glass rounded-2xl p-6 shadow-2xl sm:p-8">
-          <LoginForm />
+          <LoginForm defaultEmail={email ?? ''} defaultPassword={pw ?? ''} />
         </div>
 
         {/* Footer */}

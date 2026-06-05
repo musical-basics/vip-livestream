@@ -90,16 +90,20 @@ function firstName(name) {
 
 function renderEmail({ name, email, password }) {
   const greeting = firstName(name);
+  // Direct link: opens the login page with email + password pre-filled and logs in automatically.
+  const directUrl = `${APP_URL}/?email=${encodeURIComponent(email)}&pw=${encodeURIComponent(password)}`;
   const text = [
     `Hi ${greeting},`,
     ``,
     `Your access to the ${CONCERT.name} livestream (${CONCERT.dateLine}) is ready.`,
     ``,
-    `Watch here: ${APP_URL}`,
-    `Your email: ${email}`,
-    `Your password: ${password}`,
+    `One-click access (logs you in automatically):`,
+    directUrl,
     ``,
-    `Just open the link, enter your email and password, and you're in.`,
+    `Prefer to sign in by hand? Go to ${APP_URL} and enter:`,
+    `Email: ${email}`,
+    `Password: ${password}`,
+    ``,
     `Please keep these details private. They're unique to you.`,
     ``,
     `See you at the concert,`,
@@ -113,17 +117,19 @@ function renderEmail({ name, email, password }) {
         <p style="margin:0 0 4px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#9a8a55;">VIP Livestream</p>
         <h1 style="margin:0 0 16px;font-size:22px;font-weight:600;color:#fff;">You're on the guest list</h1>
         <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#c7c7cc;">Hi ${greeting},</p>
-        <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#c7c7cc;">Your access to the <strong style="color:#fff;">${CONCERT.name}</strong> livestream (${CONCERT.dateLine}) is ready.</p>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f0f13;border:1px solid #26262e;border-radius:12px;margin:0 0 24px;">
+        <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#c7c7cc;">Your access to the <strong style="color:#fff;">${CONCERT.name}</strong> livestream (${CONCERT.dateLine}) is ready.</p>
+        <a href="${directUrl}" style="display:block;text-align:center;background:#c5a253;color:#1a1a1a;text-decoration:none;font-weight:600;font-size:16px;padding:16px 28px;border-radius:10px;">Join the livestream &rarr;</a>
+        <p style="margin:12px 0 26px;font-size:13px;line-height:1.6;color:#8a8a92;text-align:center;">One click, nothing to type. The link logs you in automatically.</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f0f13;border:1px solid #26262e;border-radius:12px;margin:0;">
           <tr><td style="padding:18px 20px;">
+            <p style="margin:0 0 14px;font-size:12px;line-height:1.5;color:#9a9aa2;">Prefer to sign in by hand? Go to <a href="${APP_URL}" style="color:#c5a253;text-decoration:none;">${APP_URL.replace(/^https?:\/\//, "")}</a> and enter:</p>
             <p style="margin:0 0 4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#7a7a82;">Your email</p>
-            <p style="margin:0 0 14px;font-size:16px;color:#fff;font-family:ui-monospace,Menlo,Consolas,monospace;">${email}</p>
+            <p style="margin:0 0 14px;font-size:16px;color:#fff;font-family:ui-monospace,Menlo,Consolas,monospace;"><a href="${directUrl}" style="color:#fff;text-decoration:none;">${email}</a></p>
             <p style="margin:0 0 4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#7a7a82;">Your password</p>
             <p style="margin:0;font-size:22px;letter-spacing:3px;color:#fff;font-family:ui-monospace,Menlo,Consolas,monospace;">${password}</p>
           </td></tr>
         </table>
-        <a href="${APP_URL}" style="display:inline-block;background:#c5a253;color:#1a1a1a;text-decoration:none;font-weight:600;font-size:15px;padding:14px 28px;border-radius:10px;">Open the livestream →</a>
-        <p style="margin:22px 0 0;font-size:13px;line-height:1.6;color:#8a8a92;">Open the link, enter your email and password, and you're in. Please keep these details private. They're unique to you.</p>
+        <p style="margin:22px 0 0;font-size:13px;line-height:1.6;color:#8a8a92;">Please keep these details private. They're unique to you.</p>
       </td></tr>
       <tr><td style="padding:20px 36px 32px;border-top:1px solid #26262e;">
         <p style="margin:0;font-size:14px;color:#c7c7cc;">See you at the concert,<br/>Lionel</p>
