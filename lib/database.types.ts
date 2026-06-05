@@ -236,9 +236,74 @@ export interface Database {
           created_at?: string
         }
       }
+      login_events: {
+        Row: {
+          id: string
+          member_id: string | null
+          email: string
+          success: boolean
+          reason: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          member_id?: string | null
+          email: string
+          success: boolean
+          reason?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          member_id?: string | null
+          email?: string
+          success?: boolean
+          reason?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+      }
+      email_opens: {
+        Row: {
+          id: string
+          member_id: string
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          member_id: string
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          member_id?: string
+          user_agent?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      get_top_chatters: {
+        Args: {
+          p_stream_id: string
+          p_limit?: number
+        }
+        Returns: {
+          member_id: string
+          display_name: string
+          name: string
+          name_color: string | null
+          access_badges: string[]
+          is_moderator: boolean
+          message_count: number
+        }[]
+      }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }
@@ -251,6 +316,8 @@ export type MemberTimeout = Database['vip_livestream']['Tables']['member_timeout
 export type Comment = Database['vip_livestream']['Tables']['comments']['Row']
 export type Tip = Database['vip_livestream']['Tables']['tips']['Row']
 export type SetlistRecord = Database['vip_livestream']['Tables']['setlists']['Row']
+export type LoginEvent = Database['vip_livestream']['Tables']['login_events']['Row']
+export type EmailOpen = Database['vip_livestream']['Tables']['email_opens']['Row']
 
 /**
  * Arrangement category for a setlist piece, surfaced as a badge on the

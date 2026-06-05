@@ -13,8 +13,9 @@ import EmojiOverlay from './EmojiOverlay'
 import Header from './Header'
 import TipBanner from './TipBanner'
 import ConcertAnnouncementDialog from './ConcertAnnouncementDialog'
+import LeaderboardPanel from './LeaderboardPanel'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MessageSquare, Music2, MessageCircle, RefreshCw } from 'lucide-react'
+import { MessageSquare, Music2, MessageCircle, RefreshCw, Trophy } from 'lucide-react'
 import { getStreamSources, type StreamSourceId } from '@/lib/stream-sources'
 
 // ── Resize bounds ─────────────────────────────────────────────
@@ -462,7 +463,7 @@ export default function WatchPageClient({
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="glass mb-4 grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+        <TabsList className="glass mb-4 grid w-full grid-cols-3 sm:inline-flex sm:w-auto">
           <TabsTrigger value="setlist" className="flex items-center justify-center gap-2">
             <Music2 className="w-3.5 h-3.5" />
             <span>Programme</span>
@@ -470,6 +471,10 @@ export default function WatchPageClient({
           <TabsTrigger value="comments" className="flex items-center justify-center gap-2">
             <MessageCircle className="w-3.5 h-3.5" />
             <span>Leave a Note</span>
+          </TabsTrigger>
+          <TabsTrigger value="leaderboard" className="flex items-center justify-center gap-2">
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Leaderboard</span>
           </TabsTrigger>
         </TabsList>
 
@@ -483,6 +488,10 @@ export default function WatchPageClient({
             stream={stream}
             initialComments={initialComments}
           />
+        </TabsContent>
+
+        <TabsContent value="leaderboard">
+          <LeaderboardPanel stream={stream} />
         </TabsContent>
       </Tabs>
     </>
