@@ -8,7 +8,7 @@
  *   3. emails them their login email + password via Resend.
  *
  * SAFE BY DEFAULT: dry-run unless --apply is passed. Dry-run writes nothing
- * and sends nothing — it prints exactly what would happen (with sample passwords).
+ * and sends nothing:it prints exactly what would happen (with sample passwords).
  *
  * Usage:
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs                 # dry-run (default)
@@ -43,7 +43,7 @@ const REPLY_TO = process.env.EMAIL_REPLY_TO || "lionel@musicalbasics.com";
 
 // Concert details (for the email body).
 const CONCERT = {
-  name: "Belgium Concert — Live from Zaventem",
+  name: "Belgium Concert",
   dateLine: "Thursday 11 June 2026",
 };
 
@@ -63,7 +63,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
 const isTestAccount = (m) =>
   /@example\.com$/i.test(m.email) || /^test@musicalbasics\.com$/i.test(m.email);
 
-// 6 lowercase letters, no capitals — easy to type. Exclude none; pure a–z.
+// 6 lowercase letters, no capitals, easy to type. Exclude none; pure a-z.
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz";
 function makePassword() {
   let p = "";
@@ -93,7 +93,7 @@ function renderEmail({ name, email, password }) {
     `Your password: ${password}`,
     ``,
     `Just open the link, enter your email and password, and you're in.`,
-    `Please keep these details private — they're unique to you.`,
+    `Please keep these details private. They're unique to you.`,
     ``,
     `See you at the concert,`,
     `Lionel`,
@@ -116,7 +116,7 @@ function renderEmail({ name, email, password }) {
           </td></tr>
         </table>
         <a href="${APP_URL}" style="display:inline-block;background:#c5a253;color:#1a1a1a;text-decoration:none;font-weight:600;font-size:15px;padding:14px 28px;border-radius:10px;">Open the livestream →</a>
-        <p style="margin:22px 0 0;font-size:13px;line-height:1.6;color:#8a8a92;">Open the link, enter your email and password, and you're in. Please keep these details private — they're unique to you.</p>
+        <p style="margin:22px 0 0;font-size:13px;line-height:1.6;color:#8a8a92;">Open the link, enter your email and password, and you're in. Please keep these details private. They're unique to you.</p>
       </td></tr>
       <tr><td style="padding:20px 36px 32px;border-top:1px solid #26262e;">
         <p style="margin:0;font-size:14px;color:#c7c7cc;">See you at the concert,<br/>Lionel</p>
@@ -146,16 +146,16 @@ async function main() {
   // --test mode: one sample email, no DB involvement.
   if (TEST_TO) {
     if (!RESEND_API_KEY) { console.error("❌ --test requires RESEND_API_KEY"); process.exit(1); }
-    const subject = `Your VIP access — ${CONCERT.name}`;
+    const subject = `Your VIP access for the ${CONCERT.name} livestream`;
     const { html, text } = renderEmail({ name: "Lionel", email: TEST_TO, password: "abcxyz" });
     console.log(`TEST send → ${TEST_TO}`);
     console.log(`From:        ${EMAIL_FROM}`);
-    console.log(`(sample only — password "abcxyz" is not real and nothing is written to the DB)\n`);
+    console.log(`(sample only:password "abcxyz" is not real and nothing is written to the DB)\n`);
     try {
       const id = await sendEmail({ to: TEST_TO, subject, html, text });
       console.log(`✓ sent (Resend id ${id}). Check your inbox.`);
     } catch (e) {
-      console.log(`✗ FAILED — ${e.message}`);
+      console.log(`✗ FAILED:${e.message}`);
       console.log(`   If this mentions domain/verification, the From domain isn't verified in Resend yet.`);
       process.exit(1);
     }
@@ -181,7 +181,7 @@ async function main() {
 
   if (recipients.length === 0) { console.log("Nothing to do."); return; }
 
-  const subject = `Your VIP access — ${CONCERT.name}`;
+  const subject = `Your VIP access for the ${CONCERT.name} livestream`;
   let sent = 0;
   const failures = [];
 
@@ -203,19 +203,19 @@ async function main() {
       console.log(`  ✓ sent       ${m.email.padEnd(34)} pw=${password}  (id ${id})`);
     } catch (e) {
       failures.push({ email: m.email, password, error: e.message });
-      console.log(`  ✗ FAILED     ${m.email.padEnd(34)} pw=${password}  — ${e.message}`);
+      console.log(`  ✗ FAILED     ${m.email.padEnd(34)} pw=${password} :${e.message}`);
     }
   }
 
   if (APPLY) {
     console.log(`\nDone. Sent ${sent}/${recipients.length}.`);
     if (failures.length) {
-      console.log(`\n⚠️  ${failures.length} failure(s) — password was rotated but email did not send.`);
+      console.log(`\n⚠️  ${failures.length} failure(s):password was rotated but email did not send.`);
       console.log(`   Re-run for just these: --only=${failures.map((f) => f.email).join(",")}`);
       failures.forEach((f) => console.log(`   ${f.email}  pw=${f.password}  (${f.error})`));
     }
   } else {
-    console.log(`\n(dry-run — re-run with --apply to rotate passwords and send)`);
+    console.log(`\n(dry-run:re-run with --apply to rotate passwords and send)`);
   }
 }
 
