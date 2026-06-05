@@ -1,5 +1,9 @@
 # Setlist API: instructions for your agent
 
+> This is the deep-dive on the setlist endpoints. For the agent's full
+> capabilities (members, moderators, chat moderation, stream control, YouTube
+> links, tips, broadcasts), see [agent-api.md](agent-api.md).
+
 Copy-paste this whole file into your agent. It tells the agent how to read and
 edit the two setlist documents that drive the site.
 
