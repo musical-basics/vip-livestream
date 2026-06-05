@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { createClient } from '@/lib/supabase-client'
 import type { Member, Stream, ChatMessage } from '@/lib/database.types'
 import ChatMessageRow from './ChatMessageRow'
@@ -13,14 +14,25 @@ import { canModerateChat, roleLabel } from '@/lib/roles'
 import { DEFAULT_SLOW_MODE_DELAY_SECONDS } from '@/lib/chat-settings'
 
 const PAGE_SIZE = 50
-const MAX_MESSAGES_IN_MEMORY = 300
+const MAX_MESSAGES_IN_MEMORY = 1000
 const AUTO_SCROLL_THRESHOLD_PX = 96
 const LOAD_MORE_SCROLL_THRESHOLD_PX = 80
 const textareaAutoSizeStyle: CSSProperties & { fieldSizing?: string } = { fieldSizing: 'content' }
 
-function appendMessage(messages: ChatMessage[], message: ChatMessage) {
+function appendMessage(messages: ChatMessage[], message: ChatMessage, currentMemberId?: string) {
   if (messages.find((existing) => existing.id === message.id)) return messages
-  const next = [...messages, message]
+  let next = messages
+  if (currentMemberId && message.member_id === currentMemberId) {
+    next = messages.filter(
+      (m) =>
+        !(
+          m.id.startsWith('temp-') &&
+          m.content === message.content &&
+          m.emoji === message.emoji
+        )
+    )
+  }
+  next = [...next, message]
   return next.length > MAX_MESSAGES_IN_MEMORY ? next.slice(-MAX_MESSAGES_IN_MEMORY) : next
 }
 
@@ -124,7 +136,6 @@ export default function ChatPanel({
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(null)
   const [activeMenuPosition, setActiveMenuPosition] = useState<{ x: number; y: number } | null>(null)
-  const [timeTick, setTimeTick] = useState(0)
   const handleActiveMenuChange = useCallback(
     (messageId: string | null, position: { x: number; y: number } | null) => {
       setActiveMenuMessageId(messageId)
@@ -140,13 +151,6 @@ export default function ChatPanel({
     }, 1000)
     return () => clearTimeout(timer)
   }, [cooldownRemaining])
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeTick((prev) => prev + 1)
-    }, 15000)
-    return () => clearInterval(timer)
-  }, [])
 
   useEffect(() => {
     if (!activeMenuMessageId) return
@@ -199,20 +203,20 @@ export default function ChatPanel({
     return map
   }, [memberDirectory, member])
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual manages mutable measurements internally.
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 64,
+    anchorTo: 'end',
+    followOnAppend: true,
+  })
+
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
-    if (!shouldAutoScrollRef.current) return
-    const container = scrollRef.current
-    if (!container) return
-
-    if (scrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(scrollFrameRef.current)
-    }
-    scrollFrameRef.current = window.requestAnimationFrame(() => {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
-      scrollFrameRef.current = null
-    })
-  }, [])
+    if (!shouldAutoScrollRef.current || messages.length === 0) return
+    virtualizer.scrollToIndex(messages.length - 1)
+  }, [messages.length, virtualizer])
 
   useEffect(() => {
     scrollToBottom()
@@ -283,7 +287,7 @@ export default function ChatPanel({
       .channel(`stream:${streamId}`)
       .on('broadcast', { event: 'new_message' }, ({ payload }) => {
         const msg = payload as ChatMessage
-        setMessages((prev) => appendMessage(prev, msg))
+        setMessages((prev) => appendMessage(prev, msg, member.id))
         if (!msg.content && msg.emoji) {
           if (msg.emoji === '👏') {
             spawnEmojiBurst('👏', 5)
@@ -367,6 +371,22 @@ export default function ChatPanel({
     const msgContent = replaceEmoticons(content ?? input.trim())
     if (!msgContent && !emoji) return
 
+    const tempId = `temp-${Date.now()}-${Math.random()}`
+    const optimisticMessage: ChatMessage & { status?: 'sending' | 'failed' | 'sent' } = {
+      id: tempId,
+      stream_id: streamId,
+      member_id: member.id,
+      content: emoji ? null : msgContent,
+      emoji: emoji || null,
+      display_name: displayName,
+      created_at: new Date().toISOString(),
+      is_muted: false,
+      reactions: {},
+      status: 'sending',
+    }
+
+    setMessages((prev) => appendMessage(prev, optimisticMessage, member.id))
+
     setIsSending(true)
     setInput('')
     if (streamId) {
@@ -388,16 +408,26 @@ export default function ChatPanel({
       const data = await res.json()
       if (!res.ok) {
         console.error('Send error:', data)
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === tempId ? { ...msg, status: 'failed' } : msg))
+        )
         return
       }
 
       if (data.message) {
         shouldAutoScrollRef.current = true
-        setMessages((prev) => appendMessage(prev, data.message))
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === tempId ? { ...data.message, status: 'sent' } : msg))
+        )
         if (slowModeDelay > 0 && !canModerateChat(member)) {
           setCooldownRemaining(slowModeDelay)
         }
       }
+    } catch (err) {
+      console.error('Send error:', err)
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === tempId ? { ...msg, status: 'failed' } : msg))
+      )
     } finally {
       setIsSending(false)
     }
@@ -569,7 +599,7 @@ export default function ChatPanel({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-3 space-y-1"
+        className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-3 relative"
       >
         {isLoadingMore && (
           <div className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
@@ -578,37 +608,56 @@ export default function ChatPanel({
           </div>
         )}
 
-        {messages.length === 0 && (
+        {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-12 text-center">
             <span className="text-3xl mb-3">🎹</span>
             <p className="text-sm text-muted-foreground">Be the first to say hello!</p>
           </div>
+        ) : (
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const msg = messages[virtualItem.index]
+              if (!msg) return null
+              const sender = memberById.get(msg.member_id)
+              return (
+                <div
+                  key={virtualItem.key}
+                  ref={virtualizer.measureElement}
+                  data-index={virtualItem.index}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                >
+                  <ChatMessageRow
+                    message={msg}
+                    currentMember={member}
+                    senderBadges={sender?.access_badges}
+                    senderRole={roleLabel(sender)}
+                    isMuted={mutedMessageIds.has(msg.id)}
+                    streamId={streamId}
+                    onDeleted={handleMessageDeleted}
+                    isPinned={pinnedMessage?.id === msg.id}
+                    onPinToggle={handlePinToggle}
+                    onReacted={handleMessageReacted}
+                    isMenuOpen={activeMenuMessageId === msg.id}
+                    activeMenuPosition={activeMenuMessageId === msg.id ? activeMenuPosition : null}
+                    setActiveMenu={handleActiveMenuChange}
+                  />
+                </div>
+              )
+            })}
+          </div>
         )}
-
-        {messages.map((msg) => (
-          (() => {
-            const sender = memberById.get(msg.member_id)
-            return (
-              <ChatMessageRow
-                key={msg.id}
-                message={msg}
-                currentMember={member}
-                senderBadges={sender?.access_badges}
-                senderRole={roleLabel(sender)}
-                isMuted={mutedMessageIds.has(msg.id)}
-                streamId={streamId}
-                onDeleted={handleMessageDeleted}
-                isPinned={pinnedMessage?.id === msg.id}
-                onPinToggle={handlePinToggle}
-                onReacted={handleMessageReacted}
-                isMenuOpen={activeMenuMessageId === msg.id}
-                activeMenuPosition={activeMenuMessageId === msg.id ? activeMenuPosition : null}
-                setActiveMenu={handleActiveMenuChange}
-                timeTick={timeTick}
-              />
-            )
-          })()
-        ))}
       </div>
 
       {/* Emoji picker overlay */}

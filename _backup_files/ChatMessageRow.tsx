@@ -4,7 +4,7 @@ import { memo, useState } from 'react'
 import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { canModerateChat, nameColor, ROLE_BADGE } from '@/lib/roles'
-import { formatDistanceToNow } from 'date-fns'
+import { useRelativeTime } from '@/lib/use-relative-time'
 import { MoreHorizontal, Trash2, Clock, Smile, Pin } from 'lucide-react'
 import {
   Tooltip,
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/tooltip'
 
 interface ChatMessageRowProps {
-  message: ChatMessage
+  message: ChatMessage & { status?: 'sending' | 'failed' | 'sent' }
   currentMember: Member
   senderBadges?: string[]
   senderRole: 'ADMIN' | 'MOD' | null
@@ -26,7 +26,6 @@ interface ChatMessageRowProps {
   isMenuOpen: boolean
   activeMenuPosition: { x: number; y: number } | null
   setActiveMenu: (messageId: string | null, position: { x: number; y: number } | null) => void
-  timeTick?: number
 }
 
 const TIMEOUT_OPTIONS = [
@@ -49,7 +48,6 @@ function ChatMessageRow({
   isMenuOpen,
   activeMenuPosition,
   setActiveMenu,
-  timeTick,
 }: ChatMessageRowProps) {
   const [isActing, setIsActing] = useState(false)
 
@@ -58,11 +56,7 @@ function ChatMessageRow({
   const color = nameColor(senderRole, senderBadges)
   const visibleBadges = normalizeMemberBadges(senderBadges)
 
-  const displayDate = (() => {
-    const d = new Date(message.created_at)
-    const now = new Date()
-    return d > now ? now : d
-  })()
+  const relativeTime = useRelativeTime(message.created_at)
 
   function openContextMenu(e: React.MouseEvent) {
     e.preventDefault()
@@ -234,7 +228,9 @@ function ChatMessageRow({
     return (
       <div
         onContextMenu={openContextMenu}
-        className="message-appear group relative flex flex-col gap-0.5 px-2 py-1 rounded-lg hover:bg-white/3 transition-colors"
+        className={`message-appear group relative flex flex-col gap-0.5 px-2 py-1 rounded-lg transition-colors hover:bg-white/3 ${
+          message.status === 'sending' ? 'opacity-60 pointer-events-none select-none' : ''
+        } ${message.status === 'failed' ? 'bg-destructive/10 border border-destructive/20' : ''}`}
       >
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold" style={{ color }}>
@@ -264,12 +260,18 @@ function ChatMessageRow({
           </button>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default">
-                {formatDistanceToNow(displayDate, { addSuffix: true })}
+              <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default flex items-center gap-1">
+                {message.status === 'sending' && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-ping mr-1" />
+                )}
+                {message.status === 'failed' && (
+                  <span className="text-destructive font-semibold mr-1">⚠️ failed</span>
+                )}
+                {relativeTime}
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              {new Date(message.created_at).toLocaleTimeString()}
+              {message.status === 'failed' ? 'Failed to deliver message' : new Date(message.created_at).toLocaleTimeString()}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -301,7 +303,9 @@ function ChatMessageRow({
   return (
     <div
       onContextMenu={openContextMenu}
-      className="message-appear group relative flex flex-col gap-0.5 px-2 py-1 rounded-lg hover:bg-white/3 transition-colors"
+      className={`message-appear group relative flex flex-col gap-0.5 px-2 py-1 rounded-lg transition-colors hover:bg-white/3 ${
+        message.status === 'sending' ? 'opacity-60 pointer-events-none select-none' : ''
+      } ${message.status === 'failed' ? 'bg-destructive/10 border border-destructive/20' : ''}`}
     >
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold" style={{ color }}>
@@ -331,12 +335,18 @@ function ChatMessageRow({
         </button>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default">
-              {formatDistanceToNow(displayDate, { addSuffix: true })}
+            <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default flex items-center gap-1">
+              {message.status === 'sending' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-ping mr-1" />
+              )}
+              {message.status === 'failed' && (
+                <span className="text-destructive font-semibold mr-1">⚠️ failed</span>
+              )}
+              {relativeTime}
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            {new Date(message.created_at).toLocaleTimeString()}
+            {message.status === 'failed' ? 'Failed to deliver message' : new Date(message.created_at).toLocaleTimeString()}
           </TooltipContent>
         </Tooltip>
       </div>

@@ -52,7 +52,7 @@ declare global {
 }
 
 export default function VideoPlayer({ stream, fill = false, videoId: selectedVideoId }: VideoPlayerProps) {
-  const videoId = selectedVideoId ?? stream?.youtube_video_id
+  const videoId = selectedVideoId?.trim() || stream?.youtube_video_id?.trim() || null
   const playerRef = useRef<YouTubePlayer | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const playerElementRef = useRef<HTMLDivElement>(null)
@@ -63,18 +63,22 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
   }>({ isPlaying: false, playerState: 'loading', videoId: null })
   const [isPlayerMuted, setIsPlayerMuted] = useState(true)
   const hasLiveVideo = !!stream?.is_live && !!videoId
+  const playerMountKey = videoId ?? 'waiting'
   const playerState = playback.videoId === videoId ? playback.playerState : 'loading'
   const isPlaying = playback.videoId === videoId ? playback.isPlaying : false
 
   const initPlayer = useCallback(() => {
-    if (!window.YT?.Player || !playerElementRef.current || !videoId) return
+    const playerElement = playerElementRef.current
+    if (!window.YT?.Player || !playerElement || !videoId) return
 
     if (playerRef.current?.destroy) {
       playerRef.current.destroy()
       playerRef.current = null
     }
 
-    playerRef.current = new window.YT.Player(playerElementRef.current, {
+    playerElement.innerHTML = ''
+
+    playerRef.current = new window.YT.Player(playerElement, {
       width: '100%',
       height: '100%',
       videoId,
@@ -85,6 +89,8 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
         modestbranding: 1,
         playsinline: 1,
         color: 'white',
+        enablejsapi: 1,
+        origin: window.location.origin,
         mute: 1, // Start muted for reliable autoplay support
       },
       events: {
@@ -220,7 +226,7 @@ export default function VideoPlayer({ stream, fill = false, videoId: selectedVid
       )}
 
       {/* YouTube embed container */}
-      <div ref={playerElementRef} className="w-full h-full" />
+      <div key={playerMountKey} ref={playerElementRef} className="w-full h-full" />
 
       {playerState === 'ready' && (
         <button

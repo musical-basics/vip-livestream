@@ -12,22 +12,27 @@ export interface AvailableStreamSource extends StreamSource {
   videoId: string
 }
 
+function normalizeVideoId(videoId: string | null | undefined) {
+  const trimmedVideoId = videoId?.trim() ?? ''
+  return trimmedVideoId || null
+}
+
 export function getStreamSources(stream: Stream | null): StreamSource[] {
   return [
     {
       id: 'main',
       label: 'Main Stream',
-      videoId: stream?.youtube_video_id ?? null,
+      videoId: normalizeVideoId(stream?.youtube_video_id),
     },
     {
       id: 'backup1',
       label: 'Backup Stream 1',
-      videoId: stream?.backup_youtube_video_id_1 ?? null,
+      videoId: normalizeVideoId(stream?.backup_youtube_video_id_1),
     },
     {
       id: 'backup2',
       label: 'Backup Stream 2',
-      videoId: stream?.backup_youtube_video_id_2 ?? null,
+      videoId: normalizeVideoId(stream?.backup_youtube_video_id_2),
     },
   ]
 }
