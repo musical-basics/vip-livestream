@@ -29,6 +29,7 @@ BEGIN
     AND cm.is_muted = false
     AND m.is_admin = false
     AND m.is_banned = false
+    AND (cm.content IS NULL OR cm.content NOT LIKE '[System]%')
   GROUP BY cm.member_id, m.display_name, m.name, m.name_color, m.access_badges, m.is_moderator
   ORDER BY message_count DESC
   LIMIT p_limit;

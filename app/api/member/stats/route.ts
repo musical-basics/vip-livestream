@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         .select('id', { count: 'exact', head: true })
         .eq('member_id', memberId)
         .eq('is_muted', false)
-        .not('content', 'like', '[System]%'),
+        .or('content.is.null,content.not.like.[System]%'),
       
       // Current show messages count (if streamId is provided)
       streamId
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
             .eq('member_id', memberId)
             .eq('stream_id', streamId)
             .eq('is_muted', false)
-            .not('content', 'like', '[System]%')
+            .or('content.is.null,content.not.like.[System]%')
         : Promise.resolve({ count: 0 }),
 
       // All messages to group by stream_id in JS for unique streams attended
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         .select('stream_id')
         .eq('member_id', memberId)
         .eq('is_muted', false)
-        .not('content', 'like', '[System]%')
+        .or('content.is.null,content.not.like.[System]%')
     ])
 
     const streamsAttended = new Set(streamsRes.data?.map(s => s.stream_id) || []).size
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         streams_attended: streamsAttended
       }
     })
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to query member stats:', err)
     return NextResponse.json({ error: 'Failed to retrieve stats' }, { status: 500 })
   }

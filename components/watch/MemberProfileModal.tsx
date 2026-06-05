@@ -3,7 +3,7 @@
 import { useEffect, useState, startTransition } from 'react'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { ROLE_BADGE } from '@/lib/roles'
-import { CalendarDays, MessageSquare, Loader2, Award, Shield, User } from 'lucide-react'
+import { CalendarDays, MessageSquare, Loader2, User } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
@@ -45,31 +45,44 @@ export default function MemberProfileModal({
   useEffect(() => {
     if (!open || !memberId) return
 
-    setIsLoading(true)
-    setError(null)
-    setMember(null)
-    setStats(null)
+    let isCancelled = false
 
-    const url = `/api/member/stats?member_id=${memberId}${streamId ? `&stream_id=${streamId}` : ''}`
-    
-    fetch(url)
-      .then((res) => {
+    async function loadProfile() {
+      setIsLoading(true)
+      setError(null)
+      setMember(null)
+      setStats(null)
+
+      const url = `/api/member/stats?member_id=${memberId}${streamId ? `&stream_id=${streamId}` : ''}`
+
+      try {
+        const res = await fetch(url)
         if (!res.ok) throw new Error('Failed to load chatter profile')
-        return res.json()
-      })
-      .then((data) => {
+        const data = await res.json()
+        if (isCancelled) return
+
         startTransition(() => {
           setMember(data.member)
           setStats(data.stats)
         })
-      })
-      .catch((err) => {
+      } catch (err) {
+        if (isCancelled) return
         console.error(err)
         setError('Could not retrieve chatter statistics.')
-      })
-      .finally(() => {
+      } finally {
+        if (isCancelled) return
         setIsLoading(false)
-      })
+      }
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadProfile()
+    }, 0)
+
+    return () => {
+      isCancelled = true
+      window.clearTimeout(timer)
+    }
   }, [open, memberId, streamId])
 
   const handleOpenChange = (nextOpen: boolean) => {

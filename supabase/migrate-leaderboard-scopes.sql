@@ -37,8 +37,8 @@ BEGIN
       AND cm.is_muted = false
       AND m.is_admin = false
       AND m.is_banned = false
-      -- Exclude system messages from the chatter leaderboard
-      AND NOT (cm.content LIKE '[System]%')
+      -- Exclude system messages from the chatter leaderboard while counting emoji-only chats.
+      AND (cm.content IS NULL OR cm.content NOT LIKE '[System]%')
     GROUP BY cm.member_id, m.display_name, m.name, m.name_color, m.access_badges, m.is_moderator
     ORDER BY message_count DESC
     LIMIT p_limit;
@@ -59,8 +59,8 @@ BEGIN
       AND cm.is_muted = false
       AND m.is_admin = false
       AND m.is_banned = false
-      -- Exclude system messages
-      AND NOT (cm.content LIKE '[System]%')
+      -- Exclude system messages while counting emoji-only chats.
+      AND (cm.content IS NULL OR cm.content NOT LIKE '[System]%')
     GROUP BY cm.member_id, m.display_name, m.name, m.name_color, m.access_badges, m.is_moderator
     ORDER BY message_count DESC
     LIMIT p_limit;
@@ -81,8 +81,8 @@ BEGIN
       AND cm.is_muted = false
       AND m.is_admin = false
       AND m.is_banned = false
-      -- Exclude system messages
-      AND NOT (cm.content LIKE '[System]%')
+      -- Exclude system messages while counting emoji-only chats.
+      AND (cm.content IS NULL OR cm.content NOT LIKE '[System]%')
     GROUP BY cm.member_id, m.display_name, m.name, m.name_color, m.access_badges, m.is_moderator
     ORDER BY message_count DESC
     LIMIT p_limit;
@@ -102,8 +102,8 @@ BEGIN
     WHERE cm.is_muted = false
       AND m.is_admin = false
       AND m.is_banned = false
-      -- Exclude system messages
-      AND NOT (cm.content LIKE '[System]%')
+      -- Exclude system messages while counting emoji-only chats.
+      AND (cm.content IS NULL OR cm.content NOT LIKE '[System]%')
     GROUP BY cm.member_id, m.display_name, m.name, m.name_color, m.access_badges, m.is_moderator
     ORDER BY message_count DESC
     LIMIT p_limit;

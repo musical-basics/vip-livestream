@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 20)
 
     return NextResponse.json({ leaderboard })
-  } catch (err: any) {
+  } catch (err) {
     console.error('JS aggregation fallback failed:', err)
     return NextResponse.json({ error: 'Failed to fetch leaderboard' }, { status: 500 })
   }

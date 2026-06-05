@@ -41,6 +41,16 @@ interface WatchPageClientProps {
   programme?: SetlistItem[]
 }
 
+interface LeaderboardChatter {
+  member_id: string
+  display_name: string
+  name: string
+  name_color: string | null
+  access_badges: string[]
+  is_moderator: boolean
+  message_count: number
+}
+
 // ── Drag handle components ────────────────────────────────────
 type ResizeMode = 'chat' | 'bottom'
 
@@ -135,17 +145,16 @@ export default function WatchPageClient({
   useEffect(() => {
     if (!autoSwitchingTo) return
 
-    if (autoSwitchingTo.countdown <= 0) {
-      setSelectedStreamSource(autoSwitchingTo.id)
-      setAutoSwitchingTo(null)
-      return
-    }
-
     const timer = setTimeout(() => {
-      setAutoSwitchingTo((current) => {
-        if (!current) return null
-        return { ...current, countdown: current.countdown - 1 }
-      })
+      if (autoSwitchingTo.countdown <= 1) {
+        setSelectedStreamSource(autoSwitchingTo.id)
+        setAutoSwitchingTo(null)
+      } else {
+        setAutoSwitchingTo((current) => {
+          if (!current) return null
+          return { ...current, countdown: current.countdown - 1 }
+        })
+      }
     }, 1000)
 
     return () => clearTimeout(timer)
@@ -154,11 +163,10 @@ export default function WatchPageClient({
   const handlePlaybackError = useCallback((errorVideoId: string) => {
     if (selectedSource?.videoId !== errorVideoId) return
 
-    const mainSrc = streamSources.find((s) => s.id === 'main')
     const backup1Src = streamSources.find((s) => s.id === 'backup1')
     const backup2Src = streamSources.find((s) => s.id === 'backup2')
 
-    let targetSource: typeof mainSrc | undefined = undefined
+    let targetSource: typeof backup1Src | undefined = undefined
 
     if (selectedStreamSource === 'main') {
       if (backup1Src?.videoId) {
@@ -182,13 +190,14 @@ export default function WatchPageClient({
   }, [selectedStreamSource, selectedSource, streamSources])
 
   // Leaderboard state & logic
-  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const streamId = stream?.id ?? null
+  const [leaderboard, setLeaderboard] = useState<LeaderboardChatter[]>([])
   const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true)
   const [isLeaderboardRefreshing, setIsLeaderboardRefreshing] = useState(false)
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null)
 
   const fetchCurrentLeaderboard = useCallback(async (refresh = false) => {
-    if (!stream?.id) {
+    if (!streamId) {
       setIsLeaderboardLoading(false)
       return
     }
@@ -200,9 +209,9 @@ export default function WatchPageClient({
     }
 
     try {
-      const res = await fetch(`/api/chat/leaderboard?stream_id=${stream.id}&scope=current`)
+      const res = await fetch(`/api/chat/leaderboard?stream_id=${streamId}&scope=current`)
       if (!res.ok) throw new Error('Failed to fetch leaderboard')
-      const data = await res.json()
+      const data = await res.json() as { leaderboard?: LeaderboardChatter[] }
       setLeaderboard(data.leaderboard || [])
       setLeaderboardError(null)
     } catch (err) {
@@ -212,10 +221,14 @@ export default function WatchPageClient({
       setIsLeaderboardLoading(false)
       setIsLeaderboardRefreshing(false)
     }
-  }, [stream?.id])
+  }, [streamId])
 
   useEffect(() => {
-    fetchCurrentLeaderboard()
+    const timer = window.setTimeout(() => {
+      void fetchCurrentLeaderboard()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [fetchCurrentLeaderboard])
 
   const handleRealtimeMessage = useCallback((msg: ChatMessage) => {
@@ -588,7 +601,6 @@ export default function WatchPageClient({
 
         <TabsContent value="leaderboard">
           <LeaderboardPanel
-            stream={stream}
             memberDirectory={memberDirectory}
             leaderboard={leaderboard}
             isLoading={isLeaderboardLoading}

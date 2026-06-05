@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       .eq('stream_id', stream_id)
       .eq('member_id', member.id)
       .eq('is_muted', false)
-      .not('content', 'like', '[System]%')
+      .or('content.is.null,content.not.like.[System]%')
 
     const MILESTONES = [10, 25, 50, 100, 250, 500]
     if (userMessageCount && MILESTONES.includes(userMessageCount)) {

@@ -416,7 +416,7 @@ export default function ChatPanel({
     if (!autocomplete) return
     const before = input.slice(0, autocomplete.startIndex)
     const after = input.slice(autocomplete.endIndex)
-    const newVal = before + emojiChar + ' '
+    const newVal = before + emojiChar + ' ' + after
     setInput(newVal)
     if (streamId) {
       localStorage.setItem(`draft_chat_${streamId}`, newVal)

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, startTransition } from 'react'
-import type { Stream, Member } from '@/lib/database.types'
+import { useCallback, useEffect, useState, startTransition } from 'react'
+import type { Member } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { ROLE_BADGE } from '@/lib/roles'
 import { Trophy, Loader2, RefreshCw, MessageSquare, Award, Crown } from 'lucide-react'
@@ -17,7 +17,6 @@ interface Chatter {
 }
 
 interface LeaderboardPanelProps {
-  stream: Stream | null
   memberDirectory: Member[]
   leaderboard: Chatter[]
   isLoading: boolean
@@ -30,7 +29,6 @@ interface LeaderboardPanelProps {
 type ScopeType = 'current' | 'weekly' | 'monthly' | 'all-time'
 
 export default function LeaderboardPanel({
-  stream,
   memberDirectory,
   leaderboard,
   isLoading,
@@ -52,7 +50,7 @@ export default function LeaderboardPanel({
     'all-time': { chatters: [], loading: false, refreshing: false, error: null },
   })
 
-  async function fetchLocalLeaderboard(targetScope: 'weekly' | 'monthly' | 'all-time', refresh = false) {
+  const fetchLocalLeaderboard = useCallback(async (targetScope: 'weekly' | 'monthly' | 'all-time', refresh = false) => {
     setLocalLeaderboards(prev => ({
       ...prev,
       [targetScope]: {
@@ -90,22 +88,20 @@ export default function LeaderboardPanel({
         }
       }))
     }
-  }
+  }, [])
 
   useEffect(() => {
-    if (scope !== 'current') {
-      const current = localLeaderboards[scope]
-      if (current && current.chatters.length === 0 && !current.loading && !current.error) {
-        fetchAllScopesData()
-      }
-    }
-  }, [scope])
+    if (scope === 'current') return
 
-  function fetchAllScopesData() {
-    if (scope !== 'current') {
-      void fetchLocalLeaderboard(scope)
+    const current = localLeaderboards[scope]
+    if (current && current.chatters.length === 0 && !current.loading && !current.error) {
+      const timer = window.setTimeout(() => {
+        void fetchLocalLeaderboard(scope)
+      }, 0)
+
+      return () => window.clearTimeout(timer)
     }
-  }
+  }, [fetchLocalLeaderboard, localLeaderboards, scope])
 
   // Determine active view variables
   const activeChatters = scope === 'current' ? leaderboard : localLeaderboards[scope]?.chatters || []
