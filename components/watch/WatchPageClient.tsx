@@ -302,7 +302,10 @@ export default function WatchPageClient({
   function addFloatingEmoji(emoji: string) {
     const id = `${Date.now()}-${Math.random()}`
     const x  = 10 + Math.random() * 80
-    setFloatingEmojis(prev => [...prev, { id, emoji, x }])
+    setFloatingEmojis(prev => {
+      if (prev.length >= 60) return prev
+      return [...prev, { id, emoji, x }]
+    })
     setTimeout(() => {
       setFloatingEmojis(prev => prev.filter(e => e.id !== id))
     }, 2600)

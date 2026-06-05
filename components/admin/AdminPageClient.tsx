@@ -135,6 +135,21 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     setLoadingId(null)
   }
 
+  async function toggleAdmin(member: Member) {
+    setLoadingId(member.id)
+    const res = await fetch('/api/admin/member', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id: member.id, is_admin: !member.is_admin }),
+    })
+    if (res.ok) {
+      setMemberList((prev) =>
+        prev.map((m) => (m.id === member.id ? { ...m, is_admin: !m.is_admin } : m))
+      )
+    }
+    setLoadingId(null)
+  }
+
   async function toggleBan(member: Member) {
     setLoadingId(member.id)
     const res = await fetch('/api/admin/member', {
@@ -472,7 +487,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
           {/* ── MEMBERS TAB ── */}
           <TabsContent value="members" className="space-y-3">
             <p className="text-xs text-muted-foreground mb-4">
-              Manage member badges, moderator status, and bans. Use the seed script or agent API to add new members.
+              Manage member badges, roles, and bans. Crown = admin (full access, can assign roles); shield = moderator (chat moderation only). Use the seed script or agent API to add new members.
             </p>
             {memberList.map((m) => (
               <div
@@ -490,6 +505,11 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                     <span className="text-sm font-medium">{m.display_name || m.name}</span>
                     {m.display_name && m.display_name !== m.name && (
                       <span className="text-xs text-muted-foreground">({m.name})</span>
+                    )}
+                    {m.is_admin && (
+                      <Badge variant="outline" className="text-[10px] border-[oklch(0.8_0.15_85)/50] text-[oklch(0.8_0.15_85)] tracking-wide">
+                        ADMIN
+                      </Badge>
                     )}
                     {m.is_moderator && (
                       <Badge variant="outline" className="text-[10px] border-[oklch(0.75_0.12_85)/40] text-[oklch(0.75_0.12_85)] tracking-wide">
@@ -551,9 +571,17 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                   {m.id !== currentMember.id && (
                     <div className="flex items-center gap-2">
                     <button
+                      onClick={() => toggleAdmin(m)}
+                      disabled={loadingId === m.id}
+                      title={m.is_admin ? 'Remove admin' : 'Make admin (full access)'}
+                      className={`p-1.5 rounded-lg hover:bg-white/10 transition-colors ${m.is_admin ? 'text-[oklch(0.8_0.15_85)]' : 'text-muted-foreground hover:text-[oklch(0.8_0.15_85)]'}`}
+                    >
+                      <Crown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => toggleModerator(m)}
                       disabled={loadingId === m.id}
-                      title={m.is_moderator ? 'Remove moderator' : 'Make moderator'}
+                      title={m.is_moderator ? 'Remove moderator' : 'Make moderator (chat only)'}
                       className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-muted-foreground hover:text-[oklch(0.75_0.12_85)]"
                     >
                       {loadingId === m.id ? (

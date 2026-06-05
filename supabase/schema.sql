@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS vip_livestream.members (
   access_badges text[] NOT NULL DEFAULT ARRAY['vip_member']::text[],
   display_name text,
   is_moderator boolean NOT NULL DEFAULT false,
+  is_admin boolean NOT NULL DEFAULT false,
   is_banned boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT members_access_badges_not_empty CHECK (coalesce(array_length(access_badges, 1), 0) > 0),
@@ -34,6 +35,10 @@ CREATE TABLE IF NOT EXISTS vip_livestream.members (
 
 ALTER TABLE vip_livestream.members
   ADD COLUMN IF NOT EXISTS access_badges text[] NOT NULL DEFAULT ARRAY['vip_member']::text[];
+
+-- Roles: is_admin (full access, can assign mods) vs is_moderator (chat moderation only).
+ALTER TABLE vip_livestream.members
+  ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false;
 
 UPDATE vip_livestream.members
 SET access_badges = ARRAY['vip_member']::text[]
@@ -202,15 +207,15 @@ ALTER PUBLICATION supabase_realtime ADD TABLE vip_livestream.streams;
 -- Email: test@musicalbasics.com
 -- Assigned password: test
 -- Access badges: VIP Member
--- Moderator: yes, so right-click moderation can be tested
-INSERT INTO vip_livestream.members (name, email, password_token, access_badges, display_name, is_moderator, is_banned)
-VALUES ('Test Viewer', 'test@musicalbasics.com', 'test', ARRAY['vip_member']::text[], 'Test Viewer', true, false)
+-- Admin: yes (full access, can assign mods and test all moderation)
+INSERT INTO vip_livestream.members (name, email, password_token, access_badges, display_name, is_admin, is_moderator, is_banned)
+VALUES ('Test Viewer', 'test@musicalbasics.com', 'test', ARRAY['vip_member']::text[], 'Test Viewer', true, false, false)
 ON CONFLICT (email) DO UPDATE SET
   name = EXCLUDED.name,
   password_token = EXCLUDED.password_token,
   access_badges = EXCLUDED.access_badges,
   display_name = EXCLUDED.display_name,
-  is_moderator = true,
+  is_admin = true,
   is_banned = false;
 
 -- ============================================================

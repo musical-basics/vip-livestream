@@ -36,6 +36,7 @@ export default function ChatPanel({
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [applauseCooldown, setApplauseCooldown] = useState(false)
   const [isMuted, setIsMuted] = useState(initialMuted)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(initialMessages.length >= PAGE_SIZE)
@@ -45,18 +46,24 @@ export default function ChatPanel({
   const [chatFloatingEmojis, setChatFloatingEmojis] = useState<Array<{ id: string; emoji: string; x: number; delay: number }>>([])
 
   const spawnEmojiBurst = useCallback((emoji: string, count = 6) => {
-    const newEmojis = Array.from({ length: count }).map((_, i) => ({
-      id: `${Date.now()}-${i}-${Math.random()}`,
-      emoji,
-      x: 10 + Math.random() * 80,
-      delay: Math.random() * 0.5,
-    }))
-    setChatFloatingEmojis((prev) => [...prev, ...newEmojis])
-    setTimeout(() => {
-      setChatFloatingEmojis((prev) =>
-        prev.filter((e) => !newEmojis.find((ne) => ne.id === e.id))
-      )
-    }, 3000)
+    setChatFloatingEmojis((prev) => {
+      if (prev.length >= 60) return prev
+
+      const newEmojis = Array.from({ length: count }).map((_, i) => ({
+        id: `${Date.now()}-${i}-${Math.random()}`,
+        emoji,
+        x: 10 + Math.random() * 80,
+        delay: Math.random() * 0.5,
+      }))
+
+      setTimeout(() => {
+        setChatFloatingEmojis((curr) =>
+          curr.filter((e) => !newEmojis.find((ne) => ne.id === e.id))
+        )
+      }, 3000)
+
+      return [...prev, ...newEmojis]
+    })
   }, [])
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -92,9 +99,9 @@ export default function ChatPanel({
         })
         if (!msg.content && msg.emoji) {
           if (msg.emoji === '👏') {
-            spawnEmojiBurst('👏', 12)
+            spawnEmojiBurst('👏', 5)
           } else {
-            spawnEmojiBurst(msg.emoji, 6)
+            spawnEmojiBurst(msg.emoji, 3)
           }
           onEmojiReaction(msg.emoji)
         }
@@ -128,7 +135,7 @@ export default function ChatPanel({
                 const prevCount = prevReactions[emoji]?.length || 0
                 const nextCount = reactions[emoji]?.length || 0
                 if (nextCount > prevCount) {
-                  spawnEmojiBurst(emoji, 6)
+                  spawnEmojiBurst(emoji, 3)
                 }
               })
               return { ...msg, reactions }
@@ -240,11 +247,17 @@ export default function ChatPanel({
   }
 
   const handleApplauseClick = useCallback(() => {
-    if (!stream?.id) return
+    if (!stream?.id || applauseCooldown) return
+    setApplauseCooldown(true)
+
     onEmojiReaction('👏')
     sendMessage(undefined, '👏')
-    spawnEmojiBurst('👏', 12)
-  }, [stream?.id, onEmojiReaction, spawnEmojiBurst])
+    spawnEmojiBurst('👏', 5)
+
+    setTimeout(() => {
+      setApplauseCooldown(false)
+    }, 1000)
+  }, [stream?.id, applauseCooldown, onEmojiReaction, spawnEmojiBurst])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -365,11 +378,11 @@ export default function ChatPanel({
             />
              <button
               onClick={handleApplauseClick}
-              disabled={!stream?.id}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-amber-400 hover:text-amber-300 transition-colors hover:bg-white/10 hover:scale-105 active:scale-95 duration-100"
+              disabled={!stream?.id || applauseCooldown}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-amber-400 hover:text-amber-300 transition-all hover:scale-105 active:scale-95 duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
               title="Applause reaction (👏)"
             >
-              <span className="text-lg">👏</span>
+              <span className={`text-lg transition-transform ${applauseCooldown ? 'scale-75 opacity-50' : ''}`}>👏</span>
             </button>
             <button
               onClick={() => setShowEmojiPicker((v) => !v)}
