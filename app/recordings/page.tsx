@@ -7,6 +7,20 @@ import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase-server'
 import type { Stream } from '@/lib/database.types'
 
+function formatDuration(totalSeconds: number | null) {
+  if (!totalSeconds) return 'Duration unavailable'
+
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 function formatDate(value: string | null) {
   if (!value) return 'Date unavailable'
   return new Intl.DateTimeFormat('en-US', {
@@ -16,6 +30,30 @@ function formatDate(value: string | null) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value))
+}
+
+async function fetchYouTubeDurationSeconds(videoId: string) {
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, {
+      headers: {
+        'accept-language': 'en-US,en;q=0.9',
+        'user-agent': 'Mozilla/5.0 (compatible; VIPLivestreamBot/1.0)',
+      },
+      next: { revalidate: 60 * 60 * 6 },
+    })
+    if (!res.ok) return null
+
+    const html = await res.text()
+    const lengthMatch = html.match(/"lengthSeconds":"?(\d+)"?/)
+    if (lengthMatch?.[1]) return Number(lengthMatch[1])
+
+    const approxMatch = html.match(/"approxDurationMs":"?(\d+)"?/)
+    if (approxMatch?.[1]) return Math.round(Number(approxMatch[1]) / 1000)
+  } catch {
+    return null
+  }
+
+  return null
 }
 
 export default async function RecordingsPage() {
@@ -32,6 +70,13 @@ export default async function RecordingsPage() {
     .order('created_at', { ascending: false })
 
   const recordings = (data ?? []) as Stream[]
+  const durations = await Promise.all(
+    recordings.map(async (stream) => [
+      stream.id,
+      await fetchYouTubeDurationSeconds(stream.youtube_video_id),
+    ] as const)
+  )
+  const durationByStreamId = new Map(durations)
 
   return (
     <main className="min-h-[100dvh]">
@@ -99,6 +144,7 @@ export default async function RecordingsPage() {
                       <Clock className="h-3.5 w-3.5" />
                       {formatDate(stream.stream_start_utc ?? stream.created_at)}
                     </span>
+                    <span>{formatDuration(durationByStreamId.get(stream.id) ?? null)}</span>
                   </div>
 
                   {stream.description && (
