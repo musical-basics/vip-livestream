@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import type { Member, Stream, ChatMessage } from '@/lib/database.types'
 import ChatMessageRow from './ChatMessageRow'
@@ -8,9 +8,9 @@ import EmojiPicker from './EmojiPicker'
 import DisplayNameEditor from './DisplayNameEditor'
 import { Button } from '@/components/ui/button'
 import { Loader2, Send, Smile, ChevronUp, Users } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
 
 const PAGE_SIZE = 50
+const textareaAutoSizeStyle: CSSProperties & { fieldSizing?: string } = { fieldSizing: 'content' }
 
 interface ChatPanelProps {
   member: Member
@@ -43,7 +43,7 @@ export default function ChatPanel({
   const [mutedMessageIds, setMutedMessageIds] = useState<Set<string>>(new Set())
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const memberById = useMemo(() => {
     const map = new Map(memberDirectory.map((directoryMember) => [directoryMember.id, directoryMember]))
     map.set(member.id, member)
@@ -112,7 +112,7 @@ export default function ChatPanel({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [stream?.id, member.id, displayName, onTipBanner])
+  }, [stream?.id, member.id, displayName, onTipBanner, supabase])
 
   // Load older messages (scroll up pagination)
   async function loadMore() {
@@ -171,9 +171,17 @@ export default function ChatPanel({
         }),
       })
 
+      const data = await res.json()
       if (!res.ok) {
-        const err = await res.json()
-        console.error('Send error:', err)
+        console.error('Send error:', data)
+        return
+      }
+
+      if (data.message) {
+        setMessages((prev) => {
+          if (prev.find((message) => message.id === data.message.id)) return prev
+          return [...prev, data.message]
+        })
       }
     } finally {
       setIsSending(false)
@@ -280,13 +288,15 @@ export default function ChatPanel({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Say something…"
+              disabled={!stream?.id}
               rows={1}
               maxLength={500}
-              className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/8 bg-white/5 px-3 py-2.5 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] sm:text-sm max-h-[100px] overflow-y-auto"
-              style={{ fieldSizing: 'content' } as any}
+              className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/8 bg-white/5 px-3 py-2.5 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm max-h-[100px] overflow-y-auto"
+              style={textareaAutoSizeStyle}
             />
             <button
               onClick={() => setShowEmojiPicker((v) => !v)}
+              disabled={!stream?.id}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
               title="Emoji reactions"
             >
@@ -294,7 +304,7 @@ export default function ChatPanel({
             </button>
             <Button
               onClick={() => sendMessage()}
-              disabled={isSending || !input.trim()}
+              disabled={isSending || !input.trim() || !stream?.id}
               size="sm"
               className="h-11 shrink-0 rounded-xl px-3"
               style={{

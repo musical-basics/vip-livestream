@@ -411,6 +411,7 @@ export default function WatchPageClient({
             )}
           </div>
           <ChatPanel
+            key={stream?.id ?? 'waiting-room'}
             member={member}
             stream={stream}
             initialMessages={initialMessages}

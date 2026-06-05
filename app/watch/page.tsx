@@ -14,27 +14,40 @@ export default async function WatchPage() {
   // Only a YouTube-confirmed active live stream belongs on /watch.
   const stream: Stream | null = await getVerifiedLiveStream(supabase)
 
-  // Fetch all stream-dependent data in parallel once we have a stream
-  const [messagesRes, commentsRes, timeoutRes, membersRes] = stream
+  let roomStream = stream
+  if (!roomStream) {
+    const { data: newestStream } = await supabase
+      .from('streams')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    roomStream = newestStream ?? null
+  }
+
+  // Fetch room-dependent data in parallel once we have a stream record. When
+  // the video is waiting, the newest stream record acts as the chat room.
+  const [messagesRes, commentsRes, timeoutRes, membersRes] = roomStream
     ? await Promise.all([
         supabase
           .from('chat_messages')
           .select('*')
-          .eq('stream_id', stream.id)
+          .eq('stream_id', roomStream.id)
           .eq('is_muted', false)
           .order('created_at', { ascending: false })
           .limit(50),
         supabase
           .from('comments')
           .select('*')
-          .eq('stream_id', stream.id)
+          .eq('stream_id', roomStream.id)
           .eq('is_approved', true)
           .order('created_at', { ascending: true }),
         supabase
           .from('member_timeouts')
           .select('id')
           .eq('member_id', member.id)
-          .eq('stream_id', stream.id)
+          .eq('stream_id', roomStream.id)
           .or(`timeout_until.is.null,timeout_until.gt.${new Date().toISOString()}`)
           .limit(1)
           .maybeSingle(),
@@ -51,7 +64,7 @@ export default async function WatchPage() {
   return (
     <WatchPageClient
       member={member}
-      stream={stream}
+      stream={roomStream}
       initialMessages={initialMessages}
       initialComments={initialComments}
       memberDirectory={(membersRes.data as Member[]) || []}
