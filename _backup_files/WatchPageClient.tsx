@@ -14,7 +14,7 @@ import Header from './Header'
 import TipBanner from './TipBanner'
 import ConcertAnnouncementDialog from './ConcertAnnouncementDialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MessageSquare, Music2, MessageCircle, RefreshCw } from 'lucide-react'
+import { MessageSquare, Music2, MessageCircle } from 'lucide-react'
 
 // ── Resize bounds ─────────────────────────────────────────────
 const MIN_CHAT_WIDTH   = 280
@@ -25,6 +25,7 @@ const MIN_VIDEO_HEIGHT = 220
 const MIN_BOTTOM_HEIGHT = 160
 const DEFAULT_VIDEO_HEIGHT = 360
 const STREAM_SYNC_POLL_MS = 5 * 60 * 1000
+const STREAM_REFRESH_DEBOUNCE_MS = 1000
 
 // ── Types ─────────────────────────────────────────────────────
 interface WatchPageClientProps {
@@ -131,9 +132,7 @@ export default function WatchPageClient({
   const leftColumnRef = useRef<HTMLDivElement>(null)
   const videoWrapRef  = useRef<HTMLDivElement>(null)
   const hasResizedVideoRef = useRef(false)
-  const [reloadCountdown, setReloadCountdown] = useState<number | null>(null)
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const isReloadingRef = useRef(false)
+  const refreshTimerRef = useRef<number | null>(null)
   const dragStateRef  = useRef<{
     mode: ResizeMode
     startX: number
@@ -231,32 +230,17 @@ export default function WatchPageClient({
   }, [chatWidth, isDesktop, videoHeight])
 
   const refreshWatchPage = useCallback(() => {
-    if (isReloadingRef.current) return
-    isReloadingRef.current = true
+    if (refreshTimerRef.current !== null) return
 
-    const duration = Math.floor(Math.random() * 5) + 3 // 3, 4, 5, 6, or 7 seconds
-    setReloadCountdown(duration)
-
-    let currentCount = duration
-    countdownIntervalRef.current = setInterval(() => {
-      currentCount -= 1
-      if (currentCount <= 0) {
-        if (countdownIntervalRef.current) {
-          clearInterval(countdownIntervalRef.current)
-          countdownIntervalRef.current = null
-        }
-        window.location.reload()
-      } else {
-        setReloadCountdown(currentCount)
-      }
-    }, 1000)
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null
+      window.location.reload()
+    }, STREAM_REFRESH_DEBOUNCE_MS)
   }, [])
 
-  useEffect(() => {
-    return () => {
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current)
-      }
+  useEffect(() => () => {
+    if (refreshTimerRef.current !== null) {
+      window.clearTimeout(refreshTimerRef.current)
     }
   }, [])
 
@@ -362,41 +346,6 @@ export default function WatchPageClient({
           className="fixed inset-0 z-[9999]"
           style={{ cursor: resizeMode === 'chat' ? 'col-resize' : 'row-resize' }}
         />
-      )}
-
-      {reloadCountdown !== null && (
-        <div className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md transition-opacity duration-300">
-          <div className="glass max-w-md w-full mx-4 p-8 rounded-2xl border border-white/10 flex flex-col items-center text-center shadow-2xl relative overflow-hidden">
-            {/* Ambient glow in background */}
-            <div className="absolute -inset-10 bg-[radial-gradient(circle_at_center,oklch(0.75_0.12_85_/_0.15)_0%,transparent_70%)] pointer-events-none" />
-            
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="relative mb-6">
-                <div className="absolute inset-0 rounded-full bg-[oklch(0.75_0.12_85)]/10 animate-ping duration-1000" />
-                <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-black/60 text-[oklch(0.75_0.12_85)] shadow-inner">
-                  <RefreshCw className="h-8 w-8 animate-spin" style={{ animationDuration: '3s' }} />
-                </div>
-              </div>
-
-              <h2 className="text-2xl font-light text-gold mb-3" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
-                Updating Livestream URL
-              </h2>
-              
-              <p className="text-sm text-muted-foreground mb-8 max-w-xs leading-relaxed">
-                The stream settings are being synchronized. We will reconnect you automatically in a moment.
-              </p>
-
-              <div className="relative flex items-center justify-center">
-                <div className="text-5xl font-extralight text-gold tracking-tight select-none">
-                  {reloadCountdown}
-                </div>
-                <span className="text-xs text-muted-foreground/60 uppercase tracking-widest ml-2 mt-4">
-                  seconds
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Tip banner */}

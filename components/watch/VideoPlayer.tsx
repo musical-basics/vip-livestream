@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type { Stream } from '@/lib/database.types'
-import { Loader2, WifiOff, Clock, Play, Pause } from 'lucide-react'
+import { Loader2, WifiOff, Clock, Play, Pause, Volume2 } from 'lucide-react'
 
 interface VideoPlayerProps {
   stream: Stream | null
@@ -16,6 +16,8 @@ interface YouTubePlayer {
   getPlayerState?: () => number
   pauseVideo?: () => void
   playVideo?: () => void
+  mute?: () => void
+  unMute?: () => void
 }
 
 interface YouTubePlayerEvent {
@@ -58,6 +60,7 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
     playerState: PlayerStatus
     videoId: string | null
   }>({ isPlaying: false, playerState: 'loading', videoId: null })
+  const [isPlayerMuted, setIsPlayerMuted] = useState(true)
   const hasLiveVideo = !!stream?.is_live && !!videoId
   const playerState = playback.videoId === videoId ? playback.playerState : 'loading'
   const isPlaying = playback.videoId === videoId ? playback.isPlaying : false
@@ -81,11 +84,14 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
         modestbranding: 1,
         playsinline: 1,
         color: 'white',
+        mute: 1, // Start muted for reliable autoplay support
       },
       events: {
         onReady: (event) => {
           try {
+            event.target.mute?.()
             event.target.playVideo?.()
+            setIsPlayerMuted(true)
             setPlayback({ isPlaying: true, playerState: 'ready', videoId })
           } catch (err) {
             console.error('YouTube play error:', err)
@@ -106,6 +112,16 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
       },
     })
   }, [videoId])
+
+  const unmutePlayer = useCallback(() => {
+    if (!playerRef.current) return
+    try {
+      playerRef.current.unMute?.()
+      setIsPlayerMuted(false)
+    } catch (err) {
+      console.error('YouTube unmute error:', err)
+    }
+  }, [])
 
   const togglePlayback = useCallback(() => {
     if (!playerRef.current || playerState !== 'ready') return
@@ -218,6 +234,18 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
           ) : (
             <Play className="ml-0.5 h-5 w-5" aria-hidden="true" />
           )}
+        </button>
+      )}
+
+      {playerState === 'ready' && isPlayerMuted && (
+        <button
+          type="button"
+          onClick={unmutePlayer}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-xl text-black px-4 py-2.5 text-sm font-semibold shadow-lg hover:scale-105 active:scale-95 transition-all duration-100 animate-bounce"
+          style={{ background: 'linear-gradient(135deg, oklch(0.85 0.16 90), oklch(0.75 0.12 85))' }}
+        >
+          <Volume2 className="w-4 h-4 shrink-0" />
+          <span>Click to Unmute Audio 🔊</span>
         </button>
       )}
     </div>
