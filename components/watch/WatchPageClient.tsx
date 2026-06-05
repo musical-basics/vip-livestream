@@ -149,8 +149,9 @@ export default function WatchPageClient({
   }, [])
 
   const getNaturalVideoHeight = useCallback(() => {
-    const columnWidth = leftColumnRef.current?.getBoundingClientRect().width ?? window.innerWidth
-    return Math.round(columnWidth * 9 / 16)
+    const columnWidth = leftColumnRef.current?.getBoundingClientRect().width || window.innerWidth
+    const cappedWidth = Math.min(columnWidth, 1920)
+    return Math.round(cappedWidth * 9 / 16)
   }, [])
 
   // Detect desktop breakpoint
@@ -330,7 +331,7 @@ export default function WatchPageClient({
           {/* Video player */}
           <div
             ref={videoWrapRef}
-            className="relative w-full flex-shrink-0 bg-black"
+            className="relative w-full max-w-[1920px] mx-auto flex-shrink-0 bg-black"
             style={isDesktop ? { height: videoHeight } : undefined}
           >
             <VideoPlayer stream={stream} fill={isDesktop} />

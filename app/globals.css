@@ -234,3 +234,9 @@
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* Force YouTube API iframe to inherit full container size */
+#yt-player {
+  width: 100% !important;
+  height: 100% !important;
+}

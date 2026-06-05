@@ -48,6 +48,8 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
     if (!window.YT || !stream?.youtube_video_id) return
 
     playerRef.current = new window.YT.Player('yt-player', {
+      width: '100%',
+      height: '100%',
       videoId: stream.youtube_video_id,
       playerVars: {
         autoplay: 1,
