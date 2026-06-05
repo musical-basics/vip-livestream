@@ -234,9 +234,9 @@ export default function WatchPageClient({
 
     refreshTimerRef.current = window.setTimeout(() => {
       refreshTimerRef.current = null
-      router.refresh()
+      window.location.reload()
     }, STREAM_REFRESH_DEBOUNCE_MS)
-  }, [router])
+  }, [])
 
   useEffect(() => () => {
     if (refreshTimerRef.current !== null) {

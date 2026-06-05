@@ -22,3 +22,7 @@ During a live performance, viewers on `/watch` were experiencing constant video 
 - Refactored `getVerifiedLiveStream` in `lib/live-stream.ts` to treat the stream as active when its YouTube status is `'live'`, `'waiting'`, or `'unknown'`.
 - The database is updated to offline **only** when the YouTube check explicitly confirms the stream has `'ended'`.
 - If YouTube blocks scraping (status `'unknown'`), the system defaults to trusting the database state (`is_live: true` in the DB), preventing false-offline status delivery and halting the reload loops.
+
+### 3. Hard Refresh on Video Link Update
+- Changed the client-side `refreshWatchPage` in `components/watch/WatchPageClient.tsx` to execute a full window reload (`window.location.reload()`) rather than a Next.js soft data update (`router.refresh()`).
+- Soft refreshes leave the old YouTube player iframe in the DOM which can lead to player state corruption, playback drops, and static noise when a new video link is set. A clean page reload completely clears out stale YouTube Player instances and reinitializes the player with the new video ID reliably.
