@@ -26,6 +26,9 @@ import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const APPLY = process.argv.includes("--apply");
+// --no-send: with --apply, rotate the password in the DB but do NOT email anyone.
+// Useful for handing yourself one real credential to test login.
+const NO_SEND = process.argv.includes("--no-send");
 const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const ONLY = onlyArg
   ? new Set(onlyArg.slice("--only=".length).split(",").map((s) => s.trim().toLowerCase()))
@@ -197,10 +200,15 @@ async function main() {
         .from("members").update({ password_token: password }).eq("id", m.id);
       if (upErr) throw new Error(`DB update: ${upErr.message}`);
 
+      if (NO_SEND) {
+        console.log(`  rotated (no email)  ${m.email.padEnd(34)} pw=${password}`);
+        continue;
+      }
+
       const { html, text } = renderEmail({ name: m.name, email: m.email, password });
       const id = await sendEmail({ to: m.email, subject, html, text });
       sent++;
-      console.log(`  ✓ sent       ${m.email.padEnd(34)} pw=${password}  (id ${id})`);
+      console.log(`  sent  ${m.email.padEnd(34)} pw=${password}  (id ${id})`);
     } catch (e) {
       failures.push({ email: m.email, password, error: e.message });
       console.log(`  ✗ FAILED     ${m.email.padEnd(34)} pw=${password} :${e.message}`);
