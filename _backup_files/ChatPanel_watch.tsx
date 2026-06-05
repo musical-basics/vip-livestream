@@ -100,12 +100,7 @@ export default function ChatPanel({
 }: ChatPanelProps) {
   const streamId = stream?.id
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
-  const [input, setInput] = useState(() => {
-    if (typeof window !== 'undefined' && streamId) {
-      return localStorage.getItem(`draft_chat_${streamId}`) || ''
-    }
-    return ''
-  })
+  const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [applauseCooldown, setApplauseCooldown] = useState(false)
@@ -361,9 +356,6 @@ export default function ChatPanel({
 
     setIsSending(true)
     setInput('')
-    if (streamId) {
-      localStorage.removeItem(`draft_chat_${streamId}`)
-    }
 
     try {
       const res = await fetch('/api/chat/send', {
@@ -630,13 +622,7 @@ export default function ChatPanel({
             <div className="flex items-end gap-2">
               <textarea
                 value={input}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setInput(val)
-                  if (streamId) {
-                    localStorage.setItem(`draft_chat_${streamId}`, val)
-                  }
-                }}
+                onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Say something…"
                 disabled={!streamId}

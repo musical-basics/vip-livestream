@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, type PointerEvent as ReactPointerEvent } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, type PointerEvent as ReactPointerEvent } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import type { Member, Stream, ChatMessage, Comment, SetlistItem } from '@/lib/database.types'
@@ -15,6 +15,7 @@ import TipBanner from './TipBanner'
 import ConcertAnnouncementDialog from './ConcertAnnouncementDialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MessageSquare, Music2, MessageCircle, RefreshCw } from 'lucide-react'
+import { getStreamSources, type StreamSourceId } from '@/lib/stream-sources'
 
 // ── Resize bounds ─────────────────────────────────────────────
 const MIN_CHAT_WIDTH   = 280
@@ -119,12 +120,30 @@ export default function WatchPageClient({
         }
       : null
   )
+  const [selectedStreamSource, setSelectedStreamSource] = useState<StreamSourceId>('main')
+  const streamSources = useMemo(() => getStreamSources(stream), [stream])
+  const selectedSource =
+    streamSources.find((source) => source.id === selectedStreamSource && source.videoId) ??
+    streamSources.find((source) => source.videoId) ??
+    streamSources[0]
 
   // Resize state (desktop only)
   const [chatWidth, setChatWidth]       = useState(DEFAULT_CHAT_WIDTH)
   const [videoHeight, setVideoHeight]   = useState(DEFAULT_VIDEO_HEIGHT)
   const [isDesktop, setIsDesktop]       = useState(false)
   const [resizeMode, setResizeMode]     = useState<ResizeMode | null>(null)
+
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('watch_active_tab') || 'setlist'
+    }
+    return 'setlist'
+  })
+
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value)
+    localStorage.setItem('watch_active_tab', value)
+  }, [])
 
   // Drag tracking refs
   const mainLayoutRef = useRef<HTMLDivElement>(null)
@@ -230,6 +249,11 @@ export default function WatchPageClient({
     document.body.style.userSelect = 'none'
   }, [chatWidth, isDesktop, videoHeight])
 
+  useEffect(() => {
+    if (streamSources.some((source) => source.id === selectedStreamSource && source.videoId)) return
+    setSelectedStreamSource(streamSources.find((source) => source.videoId)?.id ?? 'main')
+  }, [selectedStreamSource, streamSources])
+
   const refreshWatchPage = useCallback(() => {
     if (isReloadingRef.current) return
     isReloadingRef.current = true
@@ -298,11 +322,18 @@ export default function WatchPageClient({
           is_live?: boolean
           stream_id?: string
           youtube_video_id?: string
+          backup_youtube_video_id_1?: string | null
+          backup_youtube_video_id_2?: string | null
         }
 
         const activeStreamChanged =
           data.is_live === true &&
-          (data.stream_id !== stream?.id || data.youtube_video_id !== stream?.youtube_video_id)
+          (
+            data.stream_id !== stream?.id ||
+            data.youtube_video_id !== stream?.youtube_video_id ||
+            data.backup_youtube_video_id_1 !== stream?.backup_youtube_video_id_1 ||
+            data.backup_youtube_video_id_2 !== stream?.backup_youtube_video_id_2
+          )
         const activeStreamEnded = !!stream?.is_live && data.is_live === false
         const streamCameOnline = !stream?.is_live && data.is_live === true
 
@@ -354,11 +385,43 @@ export default function WatchPageClient({
     }, 2600)
   }
 
-  return (
-    <div className="flex min-h-[100dvh] flex-col lg:h-screen lg:overflow-hidden">
-      <Header member={member} stream={stream} />
-      {resizeMode && (
-        <div
+	  return (
+	    <div className="flex min-h-[100dvh] flex-col lg:h-screen lg:overflow-hidden">
+	      <Header member={member} stream={stream} />
+      {stream && (
+        <div className="border-b border-border/30 bg-black/75 px-3 py-2 backdrop-blur sm:px-4">
+          <div
+            role="tablist"
+            aria-label="Livestream source"
+            className="mx-auto grid w-full max-w-2xl grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1"
+          >
+            {streamSources.map((source) => {
+              const isSelected = selectedSource?.id === source.id
+              const isAvailable = !!source.videoId
+
+              return (
+                <button
+                  key={source.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  disabled={!isAvailable}
+                  onClick={() => setSelectedStreamSource(source.id)}
+                  className={`min-h-10 rounded-lg px-2 text-center text-[11px] font-semibold uppercase tracking-wide transition-colors sm:text-xs ${
+                    isSelected
+                      ? 'bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] shadow-lg shadow-black/20'
+                      : 'text-muted-foreground hover:bg-white/8 hover:text-foreground'
+                  } disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-muted-foreground`}
+                >
+                  {source.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+	      {resizeMode && (
+	        <div
           className="fixed inset-0 z-[9999]"
           style={{ cursor: resizeMode === 'chat' ? 'col-resize' : 'row-resize' }}
         />
@@ -425,7 +488,7 @@ export default function WatchPageClient({
             className="relative w-full max-w-[1920px] mx-auto flex-shrink-0 bg-black"
             style={isDesktop ? { height: videoHeight } : undefined}
           >
-            <VideoPlayer stream={stream} fill={isDesktop} />
+	            <VideoPlayer stream={stream} fill={isDesktop} videoId={selectedSource?.videoId} />
             <EmojiOverlay emojis={floatingEmojis} />
           </div>
 
@@ -453,7 +516,7 @@ export default function WatchPageClient({
               </div>
             </div>
 
-            <Tabs defaultValue="setlist">
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
               <TabsList className="glass mb-4 grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
                 <TabsTrigger value="setlist" className="flex items-center justify-center gap-2">
                   <Music2 className="w-3.5 h-3.5" />

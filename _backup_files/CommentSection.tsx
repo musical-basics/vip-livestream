@@ -14,12 +14,7 @@ interface CommentSectionProps {
 
 export default function CommentSection({ member, stream, initialComments }: CommentSectionProps) {
   const [comments, setComments] = useState<Comment[]>(initialComments)
-  const [content, setContent] = useState(() => {
-    if (typeof window !== 'undefined' && stream?.id) {
-      return localStorage.getItem(`draft_comment_${stream.id}`) || ''
-    }
-    return ''
-  })
+  const [content, setContent] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -45,9 +40,6 @@ export default function CommentSection({ member, stream, initialComments }: Comm
       const { comment } = await res.json()
       setComments((prev) => [...prev, comment])
       setContent('')
-      if (stream?.id) {
-        localStorage.removeItem(`draft_comment_${stream.id}`)
-      }
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch {
@@ -78,13 +70,7 @@ export default function CommentSection({ member, stream, initialComments }: Comm
           <form onSubmit={handleSubmit} className="space-y-3">
             <textarea
               value={content}
-              onChange={(e) => {
-                const val = e.target.value
-                setContent(val)
-                if (stream?.id) {
-                  localStorage.setItem(`draft_comment_${stream.id}`, val)
-                }
-              }}
+              onChange={(e) => setContent(e.target.value)}
               placeholder="Share your thoughts, feelings, or a message for the performer…"
               rows={4}
               maxLength={1000}
