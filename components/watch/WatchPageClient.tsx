@@ -213,9 +213,9 @@ export default function WatchPageClient({
     }
   }, [getMaxChatWidth, getMaxVideoHeight])
 
-	  const startResize = useCallback((mode: ResizeMode, e: ReactPointerEvent) => {
-	    if (!isDesktop) return
-	    e.preventDefault()
+  const startResize = useCallback((mode: ResizeMode, e: ReactPointerEvent) => {
+    if (!isDesktop) return
+    e.preventDefault()
     dragStateRef.current = {
       mode,
       startX: e.clientX,
@@ -226,8 +226,8 @@ export default function WatchPageClient({
     if (mode === 'bottom') hasResizedVideoRef.current = true
     setResizeMode(mode)
     document.body.style.cursor = mode === 'chat' ? 'col-resize' : 'row-resize'
-	    document.body.style.userSelect = 'none'
-	  }, [chatWidth, isDesktop, videoHeight])
+    document.body.style.userSelect = 'none'
+  }, [chatWidth, isDesktop, videoHeight])
 
   const refreshWatchPage = useCallback(() => {
     if (refreshTimerRef.current !== null) return
@@ -244,39 +244,39 @@ export default function WatchPageClient({
     }
   }, [])
 
-	  // Auto-refresh when the active stream, live state, or YouTube link changes.
-	  useEffect(() => {
-	    const supabase = createClient()
-	    const statusChannel = supabase
-	      .channel('stream-status')
-	      .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
-	      .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
-	      .on('broadcast', { event: 'stream_updated' }, refreshWatchPage)
-	      .subscribe()
-	    const currentStreamChannel = stream?.id
-	      ? supabase
-	          .channel(`stream:${stream.id}`)
-	          .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
-	          .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
-	          .on('broadcast', { event: 'stream_updated' }, refreshWatchPage)
-	          .subscribe()
-	      : null
+  // Auto-refresh when the active stream, live state, or YouTube link changes.
+  useEffect(() => {
+    const supabase = createClient()
+    const statusChannel = supabase
+      .channel('stream-status')
+      .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
+      .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
+      .on('broadcast', { event: 'stream_updated' }, refreshWatchPage)
+      .subscribe()
+    const currentStreamChannel = stream?.id
+      ? supabase
+          .channel(`stream:${stream.id}`)
+          .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
+          .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
+          .on('broadcast', { event: 'stream_updated' }, refreshWatchPage)
+          .subscribe()
+      : null
 
     return () => {
-	      supabase.removeChannel(statusChannel)
-	      if (currentStreamChannel) supabase.removeChannel(currentStreamChannel)
-	    }
-	  }, [stream?.id, refreshWatchPage])
+      supabase.removeChannel(statusChannel)
+      if (currentStreamChannel) supabase.removeChannel(currentStreamChannel)
+    }
+  }, [stream?.id, refreshWatchPage])
 
-	  // Realtime can be missed if a tab sleeps. Poll lightly as a safety net.
-	  useEffect(() => {
-	    let isDisposed = false
-	    const checkForStreamChange = async (force = false) => {
-	      if (!force && document.visibilityState !== 'visible') return
+  // Realtime can be missed if a tab sleeps. Poll lightly as a safety net.
+  useEffect(() => {
+    let isDisposed = false
+    const checkForStreamChange = async (force = false) => {
+      if (!force && document.visibilityState !== 'visible') return
 
-	      try {
-	        const res = await fetch('/api/stream/sync', { cache: 'no-store' })
-	        if (!res.ok || isDisposed) return
+      try {
+        const res = await fetch('/api/stream/sync', { cache: 'no-store' })
+        if (!res.ok || isDisposed) return
 
         const data = await res.json() as {
           is_live?: boolean
@@ -288,30 +288,30 @@ export default function WatchPageClient({
           data.is_live === true &&
           (data.stream_id !== stream?.id || data.youtube_video_id !== stream?.youtube_video_id)
         const activeStreamEnded = !!stream?.is_live && data.is_live === false
-	        const streamCameOnline = !stream?.is_live && data.is_live === true
+        const streamCameOnline = !stream?.is_live && data.is_live === true
 
-	        if (activeStreamChanged || activeStreamEnded || streamCameOnline) {
-	          refreshWatchPage()
-	        }
-	      } catch {
-	        // The next interval will try again.
-	      }
-	    }
+        if (activeStreamChanged || activeStreamEnded || streamCameOnline) {
+          refreshWatchPage()
+        }
+      } catch {
+        // The next interval will try again.
+      }
+    }
 
-	    const handleVisibilityChange = () => {
-	      if (document.visibilityState === 'visible') {
-	        void checkForStreamChange(true)
-	      }
-	    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void checkForStreamChange(true)
+      }
+    }
 
-	    const interval = window.setInterval(checkForStreamChange, STREAM_SYNC_POLL_MS)
-	    document.addEventListener('visibilitychange', handleVisibilityChange)
-	    return () => {
-	      isDisposed = true
-	      window.clearInterval(interval)
-	      document.removeEventListener('visibilitychange', handleVisibilityChange)
-	    }
-	  }, [stream?.id, stream?.is_live, stream?.youtube_video_id, refreshWatchPage])
+    const interval = window.setInterval(checkForStreamChange, STREAM_SYNC_POLL_MS)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      isDisposed = true
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [stream?.id, stream?.is_live, stream?.youtube_video_id, refreshWatchPage])
 
   // Show tip success notification
   useEffect(() => {
