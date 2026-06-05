@@ -36,6 +36,10 @@ const ONLY = onlyArg
 // --test=<email>: send ONE sample email (dummy password) to <email>, no DB reads/writes.
 const testArg = process.argv.find((a) => a.startsWith("--test="));
 const TEST_TO = testArg ? testArg.slice("--test=".length).trim() : null;
+// --preview-to=<email>: with --only=<one member>, render that member's REAL email
+// (their real stored password) and send it to <email> instead of the member. No writes.
+const previewArg = process.argv.find((a) => a.startsWith("--preview-to="));
+const PREVIEW_TO = previewArg ? previewArg.slice("--preview-to=".length).trim() : null;
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -170,6 +174,23 @@ async function main() {
     .select("id,name,email,password_token,access_badges")
     .order("created_at");
   if (error) { console.error("❌ DB read failed:", error.message); process.exit(1); }
+
+  // --preview-to: send one real member's real email to a chosen inbox, no writes.
+  if (PREVIEW_TO) {
+    if (!ONLY || ONLY.size !== 1) {
+      console.error("❌ --preview-to requires --only=<exactly one member email>");
+      process.exit(1);
+    }
+    const m = all.find((x) => ONLY.has(x.email.toLowerCase()));
+    if (!m) { console.error("❌ no member matches --only"); process.exit(1); }
+    const subject = `Your VIP access for the ${CONCERT.name} livestream`;
+    const { html, text } = renderEmail({ name: m.name, email: m.email, password: m.password_token });
+    console.log(`PREVIEW of ${m.email}'s real email -> ${PREVIEW_TO}`);
+    console.log(`(real password ${m.password_token}; nothing written to the DB; ${m.email} is NOT emailed)\n`);
+    const id = await sendEmail({ to: PREVIEW_TO, subject, html, text });
+    console.log(`sent (Resend id ${id}). Check ${PREVIEW_TO}.`);
+    return;
+  }
 
   let recipients = all.filter((m) => !isTestAccount(m));
   if (ONLY) recipients = recipients.filter((m) => ONLY.has(m.email.toLowerCase()));
