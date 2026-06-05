@@ -212,7 +212,7 @@ export default function WatchPageClient({
     document.body.style.userSelect = 'none'
   }, [chatWidth, isDesktop, videoHeight])
 
-  // Auto-refresh page when stream goes live or ends
+  // Auto-refresh when the active stream, live state, or YouTube link changes.
   useEffect(() => {
     if (!stream?.id) return
     const supabase = createClient()
@@ -221,11 +221,13 @@ export default function WatchPageClient({
       .channel('stream-status')
       .on('broadcast', { event: 'stream_live' }, refresh)
       .on('broadcast', { event: 'stream_ended' }, refresh)
+      .on('broadcast', { event: 'stream_updated' }, refresh)
       .subscribe()
     const currentStreamChannel = supabase
       .channel(`stream:${stream.id}`)
       .on('broadcast', { event: 'stream_live' }, refresh)
       .on('broadcast', { event: 'stream_ended' }, refresh)
+      .on('broadcast', { event: 'stream_updated' }, refresh)
       .subscribe()
 
     return () => {
@@ -233,6 +235,43 @@ export default function WatchPageClient({
       supabase.removeChannel(currentStreamChannel)
     }
   }, [stream?.id, router])
+
+  // Realtime can be missed if a tab sleeps. Poll lightly as a safety net.
+  useEffect(() => {
+    if (!stream?.id) return
+
+    let isDisposed = false
+    const checkForStreamChange = async () => {
+      try {
+        const res = await fetch('/api/stream/sync', { cache: 'no-store' })
+        if (!res.ok || isDisposed) return
+
+        const data = await res.json() as {
+          is_live?: boolean
+          stream_id?: string
+          youtube_video_id?: string
+        }
+
+        const activeStreamChanged =
+          data.is_live === true &&
+          (data.stream_id !== stream.id || data.youtube_video_id !== stream.youtube_video_id)
+        const activeStreamEnded = stream.is_live && data.is_live === false
+        const streamCameOnline = !stream.is_live && data.is_live === true
+
+        if (activeStreamChanged || activeStreamEnded || streamCameOnline) {
+          router.refresh()
+        }
+      } catch {
+        // The next interval will try again.
+      }
+    }
+
+    const interval = window.setInterval(checkForStreamChange, 10000)
+    return () => {
+      isDisposed = true
+      window.clearInterval(interval)
+    }
+  }, [stream?.id, stream?.is_live, stream?.youtube_video_id, router])
 
   // Show tip success notification
   useEffect(() => {

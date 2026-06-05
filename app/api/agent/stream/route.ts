@@ -4,13 +4,16 @@ import { createServiceClient } from '@/lib/supabase-server'
 import { extractYouTubeVideoId } from '@/lib/youtube'
 import { createClient } from '@supabase/supabase-js'
 
-async function broadcastStreamStatus(streamId: string, isLive: boolean) {
+async function broadcastStreamStatus(
+  streamId: string,
+  isLive: boolean,
+  event = isLive ? 'stream_live' : 'stream_ended'
+) {
   const realtimeClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
   const payload = { stream_id: streamId, is_live: isLive }
-  const event = isLive ? 'stream_live' : 'stream_ended'
 
   await Promise.all(
     [`stream:${streamId}`, `stream-status:${streamId}`, 'stream-status'].map((topic) =>
@@ -138,9 +141,11 @@ export async function PATCH(request: NextRequest) {
       .eq('is_live', true)
   }
 
-  // Broadcast go-live / stream-ended events to all connected clients
+  // Broadcast stream changes so connected viewers refresh automatically.
   if ('is_live' in update) {
     await broadcastStreamStatus(stream_id, update.is_live === true)
+  } else if (Object.keys(update).length > 0) {
+    await broadcastStreamStatus(stream_id, stream.is_live, 'stream_updated')
   }
 
   return Response.json({ ok: true, stream })

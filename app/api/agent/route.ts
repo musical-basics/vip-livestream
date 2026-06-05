@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     member_badges: MEMBER_BADGES,
     broadcast_events: [
       'new_message', 'mute_message', 'delete_message', 'member_muted', 'stream_live',
-      'stream_ended', 'tip_received', 'announcement',
+      'stream_ended', 'stream_updated', 'tip_received', 'announcement',
     ],
   })
 }
