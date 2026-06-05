@@ -8,6 +8,7 @@ import EmojiPicker from './EmojiPicker'
 import DisplayNameEditor from './DisplayNameEditor'
 import { Button } from '@/components/ui/button'
 import { Loader2, Send, Smile, ChevronUp, Users } from 'lucide-react'
+import EmojiOverlay from './EmojiOverlay'
 
 const PAGE_SIZE = 50
 const textareaAutoSizeStyle: CSSProperties & { fieldSizing?: string } = { fieldSizing: 'content' }
@@ -41,6 +42,22 @@ export default function ChatPanel({
   const [onlineCount, setOnlineCount] = useState(1)
   const [displayName, setDisplayName] = useState(member.display_name || member.name)
   const [mutedMessageIds, setMutedMessageIds] = useState<Set<string>>(new Set())
+  const [chatFloatingEmojis, setChatFloatingEmojis] = useState<Array<{ id: string; emoji: string; x: number; delay: number }>>([])
+
+  const spawnEmojiBurst = useCallback((emoji: string, count = 6) => {
+    const newEmojis = Array.from({ length: count }).map((_, i) => ({
+      id: `${Date.now()}-${i}-${Math.random()}`,
+      emoji,
+      x: 10 + Math.random() * 80,
+      delay: Math.random() * 0.5,
+    }))
+    setChatFloatingEmojis((prev) => [...prev, ...newEmojis])
+    setTimeout(() => {
+      setChatFloatingEmojis((prev) =>
+        prev.filter((e) => !newEmojis.find((ne) => ne.id === e.id))
+      )
+    }, 3000)
+  }, [])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const supabase = useMemo(() => createClient(), [])
@@ -73,6 +90,14 @@ export default function ChatPanel({
           if (prev.find((m) => m.id === msg.id)) return prev
           return [...prev, msg]
         })
+        if (!msg.content && msg.emoji) {
+          if (msg.emoji === '👏') {
+            spawnEmojiBurst('👏', 12)
+          } else {
+            spawnEmojiBurst(msg.emoji, 6)
+          }
+          onEmojiReaction(msg.emoji)
+        }
       })
       .on('broadcast', { event: 'mute_message' }, ({ payload }) => {
         const { message_id } = payload as { message_id: string }
@@ -96,9 +121,20 @@ export default function ChatPanel({
       .on('broadcast', { event: 'message_reaction' }, ({ payload }) => {
         const { message_id, reactions } = payload as { message_id: string; reactions: Record<string, string[]> }
         setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === message_id ? { ...msg, reactions } : msg
-          )
+          prev.map((msg) => {
+            if (msg.id === message_id) {
+              const prevReactions = msg.reactions || {}
+              Object.keys(reactions).forEach((emoji) => {
+                const prevCount = prevReactions[emoji]?.length || 0
+                const nextCount = reactions[emoji]?.length || 0
+                if (nextCount > prevCount) {
+                  spawnEmojiBurst(emoji, 6)
+                }
+              })
+              return { ...msg, reactions }
+            }
+            return msg
+          })
         )
       })
       .on('broadcast', { event: 'tip_received' }, ({ payload }) => {
@@ -120,7 +156,7 @@ export default function ChatPanel({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [stream?.id, member.id, displayName, onTipBanner, supabase])
+  }, [stream?.id, member.id, displayName, onTipBanner, supabase, spawnEmojiBurst, onEmojiReaction])
 
   // Load older messages (scroll up pagination)
   async function loadMore() {
@@ -203,6 +239,13 @@ export default function ChatPanel({
     sendMessage(undefined, emoji)
   }
 
+  const handleApplauseClick = useCallback(() => {
+    if (!stream?.id) return
+    onEmojiReaction('👏')
+    sendMessage(undefined, '👏')
+    spawnEmojiBurst('👏', 12)
+  }, [stream?.id, onEmojiReaction, spawnEmojiBurst])
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -211,7 +254,7 @@ export default function ChatPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col relative">
       {/* Online count + display name */}
       <div className="flex items-center justify-between border-b border-border/30 px-3 py-2 sm:px-4">
         <DisplayNameEditor
@@ -262,7 +305,7 @@ export default function ChatPanel({
                 message={msg}
                 currentMember={member}
                 senderBadges={sender?.access_badges}
-                senderIsModerator={sender?.is_moderator ?? false}
+                senderIsModerator={!!(sender?.is_moderator || sender?.is_admin)}
                 isMuted={mutedMessageIds.has(msg.id)}
                 streamId={stream?.id}
                 onDeleted={(messageId) =>
@@ -270,9 +313,20 @@ export default function ChatPanel({
                 }
                 onReacted={(messageId, reactions) => {
                   setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === messageId ? { ...msg, reactions } : msg
-                    )
+                    prev.map((msg) => {
+                      if (msg.id === messageId) {
+                        const prevReactions = msg.reactions || {}
+                        Object.keys(reactions).forEach((emoji) => {
+                          const prevCount = prevReactions[emoji]?.length || 0
+                          const nextCount = reactions[emoji]?.length || 0
+                          if (nextCount > prevCount) {
+                            spawnEmojiBurst(emoji, 6)
+                          }
+                        })
+                        return { ...msg, reactions }
+                      }
+                      return msg
+                    })
                   )
                 }}
               />
@@ -309,6 +363,14 @@ export default function ChatPanel({
               className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/8 bg-white/5 px-3 py-2.5 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm max-h-[100px] overflow-y-auto"
               style={textareaAutoSizeStyle}
             />
+             <button
+              onClick={handleApplauseClick}
+              disabled={!stream?.id}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-amber-400 hover:text-amber-300 transition-colors hover:bg-white/10 hover:scale-105 active:scale-95 duration-100"
+              title="Applause reaction (👏)"
+            >
+              <span className="text-lg">👏</span>
+            </button>
             <button
               onClick={() => setShowEmojiPicker((v) => !v)}
               disabled={!stream?.id}
@@ -337,6 +399,8 @@ export default function ChatPanel({
           </div>
         )}
       </div>
+      {/* Floating emojis overlay for the chat panel */}
+      <EmojiOverlay emojis={chatFloatingEmojis} />
     </div>
   )
 }

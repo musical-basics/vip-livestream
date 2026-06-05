@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       : null,
     members: {
       total: members.length,
+      admins: members.filter(m => m.is_admin).length,
       moderators: members.filter(m => m.is_moderator).length,
       banned: members.filter(m => m.is_banned).length,
       badges: badgeCounts,

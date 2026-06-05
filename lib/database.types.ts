@@ -18,6 +18,7 @@ export interface Database {
           access_badges: string[]
           display_name: string | null
           is_moderator: boolean
+          is_admin: boolean
           is_banned: boolean
           created_at: string
         }
@@ -29,6 +30,7 @@ export interface Database {
           access_badges?: string[]
           display_name?: string | null
           is_moderator?: boolean
+          is_admin?: boolean
           is_banned?: boolean
           created_at?: string
         }
@@ -40,6 +42,7 @@ export interface Database {
           access_badges?: string[]
           display_name?: string | null
           is_moderator?: boolean
+          is_admin?: boolean
           is_banned?: boolean
           created_at?: string
         }

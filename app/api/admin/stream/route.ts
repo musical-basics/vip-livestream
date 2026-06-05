@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { isAdmin } from '@/lib/roles'
 import { createServiceClient } from '@/lib/supabase-server'
 import { extractYouTubeVideoId } from '@/lib/youtube'
 import { createClient as createBrowserClient } from '@supabase/supabase-js'
@@ -29,7 +30,7 @@ async function broadcastStreamStatus(
 // POST — create a new stream
 export async function POST(request: NextRequest) {
   const member = await getSession()
-  if (!member?.is_moderator) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!isAdmin(member)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { title, youtube_video_id, description, setlist } = await request.json()
   const videoId = extractYouTubeVideoId(youtube_video_id ?? '')
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
 // PATCH — update stream (go live, end stream, update details)
 export async function PATCH(request: NextRequest) {
   const member = await getSession()
-  if (!member?.is_moderator) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!isAdmin(member)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { stream_id, is_live, stream_start_utc, youtube_video_id, title, setlist } = await request.json()
 

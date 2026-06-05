@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
+import { canModerateChat } from '@/lib/roles'
 import { formatDistanceToNow } from 'date-fns'
 import { MoreHorizontal, Trash2, Clock, Smile } from 'lucide-react'
 import {
@@ -77,7 +78,7 @@ export default function ChatMessageRow({
     }
   }, [modMenuPosition])
 
-  const isMod = currentMember.is_moderator
+  const isMod = canModerateChat(currentMember)
   const isOwn = message.member_id === currentMember.id
   const color = getMemberColor(message.member_id)
   const visibleBadges = normalizeMemberBadges(senderBadges)
@@ -387,7 +388,7 @@ function ModMenu({
   onTimeout: (minutes: number | null) => void
 }) {
   const REACTION_EMOJIS = ['❤️', '👏', '🔥', '🎹', '👍', '😂']
-  const isMod = currentMember.is_moderator
+  const isMod = canModerateChat(currentMember)
 
   return (
     <div

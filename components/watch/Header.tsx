@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import type { Member, Stream } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
+import { isAdmin, roleLabel } from '@/lib/roles'
 import { LogOut, Radio, Settings, Film } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -60,9 +61,9 @@ export default function Header({ member, stream }: HeaderProps) {
           <span className="text-sm text-muted-foreground">
             {member.display_name || member.name}
           </span>
-          {member.is_moderator && (
+          {roleLabel(member) && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-[oklch(0.75_0.12_85)/15] text-[oklch(0.75_0.12_85)] border border-[oklch(0.75_0.12_85)/30] tracking-wide">
-              MOD
+              {roleLabel(member)}
             </span>
           )}
           {memberBadges.map((badgeId) => {
@@ -88,7 +89,7 @@ export default function Header({ member, stream }: HeaderProps) {
           <Film className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Recordings</span>
         </a>
-        {member.is_moderator && (
+        {isAdmin(member) && (
           <a
             href="/admin"
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-white/8"

@@ -4,6 +4,7 @@ import { Archive, ArrowLeft, ExternalLink, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getSession } from '@/lib/auth'
+import { isAdmin } from '@/lib/roles'
 import { createServiceClient } from '@/lib/supabase-server'
 import { fetchYouTubeVideoMetadata } from '@/lib/youtube-metadata'
 import type { Stream } from '@/lib/database.types'
@@ -60,11 +61,11 @@ export default async function RecordingsPage() {
     <main className="min-h-[100dvh]">
       <header className="glass-heavy flex flex-wrap items-center gap-3 border-b border-border/50 px-4 py-4 sm:px-6">
         <Link
-          href={member.is_moderator ? '/admin' : '/watch'}
+          href={isAdmin(member) ? '/admin' : '/watch'}
           className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          {member.is_moderator ? 'Back to Admin' : 'Back to Livestream'}
+          {isAdmin(member) ? 'Back to Admin' : 'Back to Livestream'}
         </Link>
         <div className="flex items-center gap-2">
           <Archive className="h-4 w-4 text-[oklch(0.75_0.12_85)]" />
@@ -111,7 +112,7 @@ export default async function RecordingsPage() {
                       >
                         {stream.title}
                       </h2>
-                      {member.is_moderator && (
+                      {isAdmin(member) && (
                         <p className="mt-1 font-mono text-xs text-muted-foreground">
                           ID: {stream.youtube_video_id}
                         </p>

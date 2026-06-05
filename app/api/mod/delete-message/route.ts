@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { canModerateChat } from '@/lib/roles'
 import { createServiceClient } from '@/lib/supabase-server'
 import { createClient as createBrowserClient } from '@supabase/supabase-js'
 
 export async function DELETE(request: NextRequest) {
   const member = await getSession()
-  if (!member?.is_moderator) {
+  if (!canModerateChat(member)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

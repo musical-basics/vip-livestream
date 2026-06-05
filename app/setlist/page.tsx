@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ArrowLeft, Music2, Clock3, KeyRound, ListChecks, CircleHelp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { getSession } from '@/lib/auth'
+import { isAdmin } from '@/lib/roles'
 import { SETLIST_COLUMNS, type SetlistRow } from '@/lib/belgium-setlist'
 import { getBelgiumTracker } from '@/lib/setlist-store'
 
@@ -94,11 +95,11 @@ function SectionTitle({
 
 export default async function SetlistPage() {
   // Internal production tracker (click tracks, lighting, open decisions), so
-  // it is moderator-only, the same gate the recordings page uses. Ordinary VIP
-  // viewers see the polished programme on /watch instead.
+  // it is admin-only. Moderators (chat-only) and ordinary VIP viewers see the
+  // polished programme on /watch instead.
   const member = await getSession()
   if (!member) redirect('/')
-  if (!member.is_moderator) redirect('/watch')
+  if (!isAdmin(member)) redirect('/watch')
 
   const tracker = await getBelgiumTracker()
   const {

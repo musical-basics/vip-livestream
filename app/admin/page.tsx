@@ -1,12 +1,13 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
+import { isAdmin } from '@/lib/roles'
 import { createServiceClient } from '@/lib/supabase-server'
 import AdminPageClient from '@/components/admin/AdminPageClient'
 
 export default async function AdminPage() {
   const member = await getSession()
   if (!member) redirect('/')
-  if (!member.is_moderator) redirect('/watch')
+  if (!isAdmin(member)) redirect('/watch')
 
   const supabase = createServiceClient()
 
