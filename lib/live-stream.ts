@@ -15,7 +15,7 @@ export async function getVerifiedLiveStream(supabase: ServiceClient) {
   const candidates = (data ?? []) as Stream[]
 
   for (const stream of candidates) {
-    const metadata = await fetchYouTubeVideoMetadata(stream.youtube_video_id, { cache: 'no-store' })
+    const metadata = await fetchYouTubeVideoMetadata(stream.youtube_video_id, { revalidate: 30 })
 
     if (metadata.broadcastStatus === 'live') {
       return stream

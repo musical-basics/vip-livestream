@@ -147,7 +147,11 @@ export async function fetchYouTubeVideoMetadata(
   options: YouTubeMetadataOptions = {}
 ): Promise<YouTubeVideoMetadata> {
   try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000)
+
     const fetchOptions: NextFetchInit = {
+      signal: controller.signal,
       headers: {
         'accept-language': 'en-US,en;q=0.9',
         'user-agent': 'Mozilla/5.0 (compatible; VIPLivestreamBot/1.0)',
@@ -161,6 +165,8 @@ export async function fetchYouTubeVideoMetadata(
     }
 
     const res = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, fetchOptions)
+    clearTimeout(timeoutId)
+
     if (!res.ok) {
       return { broadcastStatus: 'unknown', durationSeconds: null, title: null }
     }
