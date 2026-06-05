@@ -10,46 +10,12 @@ interface SetlistPanelProps {
   stream: Stream | null
 }
 
-// Fallback placeholder only — shown when a stream has no setlist in the DB.
-// The real, editable setlist lives on streams.setlist (jsonb) and is managed
-// via the admin UI or the agent API (PATCH /api/agent/stream { stream_id, setlist }).
-const DEMO_SETLIST: SetlistItem[] = [
-  {
-    id: '1',
-    piece: 'Ballade No. 1 in G minor',
-    composer: 'Frédéric Chopin',
-    composerYears: '1810–1849',
-    performer: 'The Artist',
-    duration: '~9 min',
-    notes: 'Op. 23 — One of the most celebrated works for solo piano, blending poetry and drama.',
-  },
-  {
-    id: '2',
-    piece: 'Sonata in B minor',
-    composer: 'Franz Liszt',
-    composerYears: '1811–1886',
-    performer: 'The Artist',
-    duration: '~30 min',
-    notes: 'A monumental single-movement work that spans the full emotional range of the Romantic era.',
-  },
-  {
-    id: '3',
-    piece: 'Goldberg Variations, BWV 988',
-    composer: 'Johann Sebastian Bach',
-    composerYears: '1685–1750',
-    performer: 'The Artist',
-    duration: '~45–80 min',
-    notes: 'An aria with 30 variations — a cornerstone of keyboard literature.',
-  },
-]
-
 export default function SetlistPanel({ stream }: SetlistPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const setlist: SetlistItem[] =
-    stream?.setlist
-      ? (stream.setlist as unknown as SetlistItem[])
-      : DEMO_SETLIST
+  const setlist: SetlistItem[] = Array.isArray(stream?.setlist)
+    ? (stream.setlist as unknown as SetlistItem[])
+    : []
 
   if (!setlist || setlist.length === 0) {
     return (
