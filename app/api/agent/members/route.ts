@@ -91,7 +91,12 @@ export async function POST(request: NextRequest) {
  * PATCH /api/agent/members
  * Update a member's properties.
  * Body: { member_id, display_name?, access_badges?, is_moderator?, is_admin?, is_banned?, regenerate_token? }
- * If regenerate_token=true, a new assigned password is returned.
+ *
+ * Password rotation is DISABLED. regenerate_token no longer changes the
+ * password (rotating it server-side without delivering it just breaks the
+ * member's login). When passed, it returns the member's EXISTING credentials
+ * so they can be re-shared; to actually deliver them, run
+ * scripts/email-livestream-credentials.mjs.
  */
 export async function PATCH(request: NextRequest) {
   if (!verifyAgentKey(request)) return agentUnauthorized()
@@ -108,10 +113,6 @@ export async function PATCH(request: NextRequest) {
     update.access_badges = normalizeMemberBadges(rest.access_badges)
   }
 
-  if (regenerate_token) {
-    update.password_token = crypto.randomUUID()
-  }
-
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('members')
@@ -125,7 +126,11 @@ export async function PATCH(request: NextRequest) {
   return Response.json({
     ok: true,
     member: data,
-    ...(regenerate_token && { login_url: APP_URL, assigned_password: data.password_token }),
+    ...(regenerate_token && {
+      login_url: APP_URL,
+      assigned_password: data.password_token,
+      note: 'Password rotation is disabled; returning the existing password unchanged. To deliver credentials, run scripts/email-livestream-credentials.mjs.',
+    }),
   })
 }
 

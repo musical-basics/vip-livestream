@@ -3,8 +3,10 @@
  * Email livestream access credentials to all livestream ticket-holders.
  *
  * For each real member (test accounts excluded) it emails their current
- * login email + assigned password via Resend. Existing passwords are reused
- * by default so previously emailed links keep working.
+ * login email + assigned password via Resend. Existing passwords are ALWAYS
+ * reused so previously emailed links keep working — passwords are never
+ * rotated. (A brand-new member with no password yet is assigned one on first
+ * send; that is initial assignment, not a rotation.)
  *
  * SAFE BY DEFAULT: dry-run unless --apply is passed. Dry-run writes nothing
  * and sends nothing:it prints exactly what would happen.
@@ -13,8 +15,9 @@
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs                 # dry-run (default)
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --only=you@x.com  # restrict to one/few (comma-sep)
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --only=you@x.com --apply  # real test send to yourself
- *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --apply         # send current credentials to everyone
- *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --apply --rotate # rotate + send to everyone
+ *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --apply         # resend current credentials to everyone
+ *
+ * Note: --rotate / --no-send are disabled (rotation is off). They will error out.
  *
  * Required env (.env.local):
  *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY
@@ -26,10 +29,15 @@ import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const APPLY = process.argv.includes("--apply");
-// --no-send: with --apply, rotate the password in the DB but do NOT email anyone.
-// Useful for handing yourself one real credential to test login.
-const NO_SEND = process.argv.includes("--no-send");
-const ROTATE = process.argv.includes("--rotate") || NO_SEND;
+// Password rotation is permanently DISABLED. Existing passwords must never
+// change, so previously emailed credentials always keep working. The script
+// only ever reuses a member's stored password; brand-new members with no
+// password yet still get one assigned on their first send (that is initial
+// assignment, not a rotation). --rotate / --no-send are refused below.
+const ROTATE_REQUESTED =
+  process.argv.includes("--rotate") || process.argv.includes("--no-send");
+const NO_SEND = false;
+const ROTATE = false;
 const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const ONLY = onlyArg
   ? new Set(onlyArg.slice("--only=".length).split(",").map((s) => s.trim().toLowerCase()))
@@ -61,6 +69,14 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 }
 if (APPLY && !RESEND_API_KEY) {
   console.error("❌ --apply requires RESEND_API_KEY in .env.local");
+  process.exit(1);
+}
+if (ROTATE_REQUESTED) {
+  console.error(
+    "❌ Password rotation is disabled. Existing passwords are never changed so " +
+    "previously emailed credentials keep working. Remove --rotate / --no-send. " +
+    "(Members with no password yet are still assigned one on first send.)"
+  );
   process.exit(1);
 }
 
@@ -262,7 +278,7 @@ async function main() {
       failures.forEach((f) => console.log(`   ${f.email}  pw=${f.password}  (${f.error})`));
     }
   } else {
-    console.log(`\n(dry-run:re-run with --apply to rotate passwords and send)`);
+    console.log(`\n(dry-run:re-run with --apply to send current credentials)`);
   }
 }
 

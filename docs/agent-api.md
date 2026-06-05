@@ -201,7 +201,7 @@ Notes:
 | --- | --- | --- | --- |
 | GET | `/members` | `?moderators_only=true`, `?admins_only=true`, `?banned=true|false` | Lists members with `login_url` + `assigned_password`. |
 | POST | `/members` | `{ name, email, is_moderator?, is_admin?, display_name?, access_badges? }` | Add (upserts on email). Returns login credentials. Badges: `vip_member`, `private_student`, `dreamplay_buyer`. |
-| PATCH | `/members` | `{ member_id, display_name?, name?, access_badges?, is_moderator?, is_admin?, is_banned?, regenerate_token? }` | Update. `is_admin` = full access, `is_moderator` = chat-only. `regenerate_token: true` issues a new password and returns the login link. |
+| PATCH | `/members` | `{ member_id, display_name?, name?, access_badges?, is_moderator?, is_admin?, is_banned?, regenerate_token? }` | Update. `is_admin` = full access, `is_moderator` = chat-only. Password rotation is disabled: `regenerate_token` does NOT change the password, it just returns the existing `login_url` + `assigned_password`. To deliver credentials, run `scripts/email-livestream-credentials.mjs`. |
 | DELETE | `/members` | `{ member_id }` | Remove a member entirely. |
 
 ### Chat messages
