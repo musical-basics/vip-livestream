@@ -52,6 +52,8 @@ export interface Database {
           id: string
           title: string
           youtube_video_id: string
+          backup_youtube_video_id_1: string | null
+          backup_youtube_video_id_2: string | null
           stream_start_utc: string | null
           is_live: boolean
           setlist: Json | null
@@ -64,6 +66,8 @@ export interface Database {
           id?: string
           title: string
           youtube_video_id: string
+          backup_youtube_video_id_1?: string | null
+          backup_youtube_video_id_2?: string | null
           stream_start_utc?: string | null
           is_live?: boolean
           setlist?: Json | null
@@ -76,6 +80,8 @@ export interface Database {
           id?: string
           title?: string
           youtube_video_id?: string
+          backup_youtube_video_id_1?: string | null
+          backup_youtube_video_id_2?: string | null
           stream_start_utc?: string | null
           is_live?: boolean
           setlist?: Json | null
@@ -228,10 +234,10 @@ export interface Database {
         }
       }
     }
-    Views: {}
-    Functions: {}
-    Enums: {}
-    CompositeTypes: {}
+    Views: Record<string, never>
+    Functions: Record<string, never>
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }
 

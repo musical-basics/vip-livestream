@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
     .insert({
       title,
       youtube_video_id: videoId,
-      backup_youtube_video_id_1: backupVideoId1.videoId,
-      backup_youtube_video_id_2: backupVideoId2.videoId,
+      ...(backupVideoId1.videoId && { backup_youtube_video_id_1: backupVideoId1.videoId }),
+      ...(backupVideoId2.videoId && { backup_youtube_video_id_2: backupVideoId2.videoId }),
       description,
       setlist,
       is_live: false,
@@ -122,12 +122,12 @@ export async function PATCH(request: NextRequest) {
   const update: {
     is_live?: boolean
     stream_start_utc?: string | null
-	    youtube_video_id?: string
+      youtube_video_id?: string
     backup_youtube_video_id_1?: string | null
     backup_youtube_video_id_2?: string | null
-	    title?: string
-	    setlist?: unknown
-	  } = {}
+      title?: string
+      setlist?: unknown
+    } = {}
   if (is_live !== undefined) update.is_live = is_live
   if (stream_start_utc !== undefined) update.stream_start_utc = stream_start_utc
   if (is_live === true && stream_start_utc === undefined) {

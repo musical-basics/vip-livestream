@@ -26,12 +26,14 @@ export async function GET() {
     offsetSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000))
   }
 
-  return NextResponse.json({
-    is_live: true,
-    stream_id: stream.id,
-    youtube_video_id: stream.youtube_video_id,
-    stream_start_utc: stream.stream_start_utc,
-    server_now: serverNow,
+    return NextResponse.json({
+      is_live: true,
+      stream_id: stream.id,
+      youtube_video_id: stream.youtube_video_id,
+    backup_youtube_video_id_1: stream.backup_youtube_video_id_1 ?? null,
+    backup_youtube_video_id_2: stream.backup_youtube_video_id_2 ?? null,
+      stream_start_utc: stream.stream_start_utc,
+      server_now: serverNow,
     offset_seconds: offsetSeconds,
   })
 }

@@ -88,11 +88,11 @@ export async function POST(request: NextRequest) {
   const { data: stream, error } = await supabase
     .from('streams')
     .insert({
-	      title,
-	      youtube_video_id: videoId,
-      backup_youtube_video_id_1: backupVideoId1.videoId,
-      backup_youtube_video_id_2: backupVideoId2.videoId,
-	      description,
+        title,
+        youtube_video_id: videoId,
+      ...(backupVideoId1.videoId && { backup_youtube_video_id_1: backupVideoId1.videoId }),
+      ...(backupVideoId2.videoId && { backup_youtube_video_id_2: backupVideoId2.videoId }),
+        description,
       setlist,
       is_live: is_live ?? false,
       ...(is_live === true && { stream_start_utc: new Date().toISOString() }),

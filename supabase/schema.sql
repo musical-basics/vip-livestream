@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS vip_livestream.streams (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
   youtube_video_id text NOT NULL,
+  backup_youtube_video_id_1 text,
+  backup_youtube_video_id_2 text,
   stream_start_utc timestamptz,
   is_live boolean NOT NULL DEFAULT false,
   setlist jsonb,
@@ -80,6 +82,12 @@ CREATE TABLE IF NOT EXISTS vip_livestream.streams (
   pinned_message jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE vip_livestream.streams
+  ADD COLUMN IF NOT EXISTS backup_youtube_video_id_1 text;
+
+ALTER TABLE vip_livestream.streams
+  ADD COLUMN IF NOT EXISTS backup_youtube_video_id_2 text;
 
 ALTER TABLE vip_livestream.streams
   ADD COLUMN IF NOT EXISTS slow_mode_delay integer NOT NULL DEFAULT 10;

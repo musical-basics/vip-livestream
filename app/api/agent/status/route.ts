@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
 
   const [liveStreamRes, membersRes, messagesRes] = await Promise.all([
     supabase
-      .from('streams')
-      .select('id, title, is_live, youtube_video_id, stream_start_utc, created_at')
+        .from('streams')
+        .select('*')
       .eq('is_live', true)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
   const newestStreamRes = liveStreamRes.data
     ? { data: null }
     : await supabase
-        .from('streams')
-        .select('id, title, is_live, youtube_video_id, stream_start_utc, created_at')
+          .from('streams')
+          .select('*')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -52,9 +52,11 @@ export async function GET(request: NextRequest) {
       ? {
           id: stream.id,
           title: stream.title,
-          is_live: stream.is_live,
-          youtube_video_id: stream.youtube_video_id,
-          stream_start_utc: stream.stream_start_utc,
+            is_live: stream.is_live,
+            youtube_video_id: stream.youtube_video_id,
+          backup_youtube_video_id_1: stream.backup_youtube_video_id_1 ?? null,
+          backup_youtube_video_id_2: stream.backup_youtube_video_id_2 ?? null,
+            stream_start_utc: stream.stream_start_utc,
         }
       : null,
     members: {

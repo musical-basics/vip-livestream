@@ -38,26 +38,61 @@ interface AdminPageClientProps {
   members: Member[]
 }
 
+interface StreamLinkDraft {
+  youtube_video_id: string
+  backup_youtube_video_id_1: string
+  backup_youtube_video_id_2: string
+}
+
+function streamToLinkDraft(stream: Stream): StreamLinkDraft {
+  return {
+    youtube_video_id: stream.youtube_video_id,
+    backup_youtube_video_id_1: stream.backup_youtube_video_id_1 ?? '',
+    backup_youtube_video_id_2: stream.backup_youtube_video_id_2 ?? '',
+  }
+}
+
 export default function AdminPageClient({ currentMember, streams, members }: AdminPageClientProps) {
   const [streamList, setStreamList] = useState<Stream[]>(streams)
   const [memberList, setMemberList] = useState<Member[]>(members)
   const [isCreating, setIsCreating] = useState(false)
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [linkDrafts, setLinkDrafts] = useState<Record<string, StreamLinkDraft>>(
+    () => Object.fromEntries(streams.map((stream) => [stream.id, streamToLinkDraft(stream)]))
+  )
 
   // New stream form
-  const [newStream, setNewStream] = useState({
-    title: '',
-    youtube_video_id: '',
-    description: '',
-    setlist: '',
-  })
+    const [newStream, setNewStream] = useState({
+      title: '',
+      youtube_video_id: '',
+    backup_youtube_video_id_1: '',
+    backup_youtube_video_id_2: '',
+      description: '',
+      setlist: '',
+    })
 
   async function createStream() {
     if (!newStream.title || !newStream.youtube_video_id) return
     setLoadingId('new')
     const videoId = extractYouTubeVideoId(newStream.youtube_video_id)
+    const backupVideoId1 = newStream.backup_youtube_video_id_1.trim()
+      ? extractYouTubeVideoId(newStream.backup_youtube_video_id_1)
+      : ''
+    const backupVideoId2 = newStream.backup_youtube_video_id_2.trim()
+      ? extractYouTubeVideoId(newStream.backup_youtube_video_id_2)
+      : ''
     if (!videoId) {
       alert('Please enter a valid YouTube video URL or video ID.')
+      setLoadingId(null)
+      return
+    }
+    if (newStream.backup_youtube_video_id_1.trim() && !backupVideoId1) {
+      alert('Please enter a valid Backup Stream 1 YouTube URL or video ID.')
+      setLoadingId(null)
+      return
+    }
+    if (newStream.backup_youtube_video_id_2.trim() && !backupVideoId2) {
+      alert('Please enter a valid Backup Stream 2 YouTube URL or video ID.')
       setLoadingId(null)
       return
     }
@@ -77,9 +112,11 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        title: newStream.title,
-        youtube_video_id: videoId,
-        description: newStream.description || null,
+          title: newStream.title,
+          youtube_video_id: videoId,
+        backup_youtube_video_id_1: backupVideoId1 || null,
+        backup_youtube_video_id_2: backupVideoId2 || null,
+          description: newStream.description || null,
         setlist: parsedSetlist,
       }),
     })
@@ -87,7 +124,15 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     if (res.ok) {
       const { stream } = await res.json()
       setStreamList((prev) => [stream, ...prev])
-      setNewStream({ title: '', youtube_video_id: '', description: '', setlist: '' })
+      setLinkDrafts((prev) => ({ ...prev, [stream.id]: streamToLinkDraft(stream) }))
+      setNewStream({
+        title: '',
+        youtube_video_id: '',
+        backup_youtube_video_id_1: '',
+        backup_youtube_video_id_2: '',
+        description: '',
+        setlist: '',
+      })
       setIsCreating(false)
     }
     setLoadingId(null)
@@ -116,8 +161,9 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
             : goLive
               ? { ...s, is_live: false }
             : s
+          )
         )
-      )
+      setLinkDrafts((prev) => ({ ...prev, [updatedStream.id]: streamToLinkDraft(updatedStream) }))
     }
     setLoadingId(null)
   }
@@ -139,6 +185,58 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     } catch (err) {
       console.error(err)
       alert('An error occurred while trying to send the refresh signal.')
+    } finally {
+      setLoadingId(null)
+    }
+  }
+
+  async function updateStreamLinks(stream: Stream) {
+    const draft = linkDrafts[stream.id] ?? streamToLinkDraft(stream)
+    const videoId = extractYouTubeVideoId(draft.youtube_video_id)
+    const backupVideoId1 = draft.backup_youtube_video_id_1.trim()
+      ? extractYouTubeVideoId(draft.backup_youtube_video_id_1)
+      : ''
+    const backupVideoId2 = draft.backup_youtube_video_id_2.trim()
+      ? extractYouTubeVideoId(draft.backup_youtube_video_id_2)
+      : ''
+
+    if (!videoId) {
+      alert('Please enter a valid Main Stream YouTube URL or video ID.')
+      return
+    }
+    if (draft.backup_youtube_video_id_1.trim() && !backupVideoId1) {
+      alert('Please enter a valid Backup Stream 1 YouTube URL or video ID.')
+      return
+    }
+    if (draft.backup_youtube_video_id_2.trim() && !backupVideoId2) {
+      alert('Please enter a valid Backup Stream 2 YouTube URL or video ID.')
+      return
+    }
+
+    setLoadingId(`links-${stream.id}`)
+    try {
+      const res = await fetch('/api/admin/stream', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stream_id: stream.id,
+          youtube_video_id: videoId,
+          backup_youtube_video_id_1: backupVideoId1 || null,
+          backup_youtube_video_id_2: backupVideoId2 || null,
+        }),
+      })
+
+      if (!res.ok) {
+        alert('Failed to update stream sources.')
+        return
+      }
+
+      const { stream: updatedStream } = await res.json()
+      setStreamList((prev) => prev.map((item) => (item.id === stream.id ? updatedStream : item)))
+      setLinkDrafts((prev) => ({ ...prev, [stream.id]: streamToLinkDraft(updatedStream) }))
+    } catch (err) {
+      console.error(err)
+      alert('An error occurred while updating stream sources.')
     } finally {
       setLoadingId(null)
     }
@@ -189,7 +287,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     setLoadingId(null)
   }
 
-  async function toggleBadge(member: Member, badgeId: MemberBadgeId) {
+    async function toggleBadge(member: Member, badgeId: MemberBadgeId) {
     const currentBadges = normalizeMemberBadges(member.access_badges)
     const nextBadges = currentBadges.includes(badgeId)
       ? currentBadges.filter((badge) => badge !== badgeId)
@@ -207,10 +305,79 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
         prev.map((m) => (m.id === member.id ? { ...m, access_badges: updatedMember.access_badges } : m))
       )
     }
-    setLoadingId(null)
+      setLoadingId(null)
+    }
+
+  function renderStreamLinkEditor(stream: Stream) {
+    const draft = linkDrafts[stream.id] ?? streamToLinkDraft(stream)
+
+    const updateDraft = (field: keyof StreamLinkDraft, value: string) => {
+      setLinkDrafts((prev) => ({
+        ...prev,
+        [stream.id]: {
+          ...draft,
+          [field]: value,
+        },
+      }))
+    }
+
+    return (
+      <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <label className="space-y-1.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Main Stream
+            </span>
+            <input
+              value={draft.youtube_video_id}
+              onChange={(e) => updateDraft('youtube_video_id', e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs transition-colors focus:border-[oklch(0.75_0.12_85)] focus:outline-none"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Backup Stream 1
+            </span>
+            <input
+              value={draft.backup_youtube_video_id_1}
+              onChange={(e) => updateDraft('backup_youtube_video_id_1', e.target.value)}
+              placeholder="Optional"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs transition-colors focus:border-[oklch(0.75_0.12_85)] focus:outline-none"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Backup Stream 2
+            </span>
+            <input
+              value={draft.backup_youtube_video_id_2}
+              onChange={(e) => updateDraft('backup_youtube_video_id_2', e.target.value)}
+              placeholder="Optional"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs transition-colors focus:border-[oklch(0.75_0.12_85)] focus:outline-none"
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <Button
+            onClick={() => updateStreamLinks(stream)}
+            disabled={loadingId === `links-${stream.id}`}
+            size="sm"
+            variant="outline"
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 hover:bg-white/5"
+          >
+            {loadingId === `links-${stream.id}` ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Save className="w-3.5 h-3.5 text-[oklch(0.75_0.12_85)]" />
+            )}
+            Save Stream Sources
+          </Button>
+        </div>
+      </div>
+    )
   }
 
-  const liveStream = streamList.find((s) => s.is_live)
+    const liveStream = streamList.find((s) => s.is_live)
   const currentStream = liveStream ?? streamList[0] ?? null
   const archivedStreams = currentStream
     ? streamList.filter((stream) => stream.id !== currentStream.id)
@@ -300,21 +467,43 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                       className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-[oklch(0.75_0.12_85)] transition-colors"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1.5">
-                      YouTube URL or Video ID *
-                    </label>
-                    <input
-                      value={newStream.youtube_video_id}
+                    <div>
+                      <label className="block text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1.5">
+                        Main Stream *
+                      </label>
+                      <input
+                        value={newStream.youtube_video_id}
                       onChange={(e) => setNewStream((p) => ({ ...p, youtube_video_id: e.target.value }))}
                       placeholder="https://youtube.com/live/bEF9k5bGM2c?feature=share"
                       className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-[oklch(0.75_0.12_85)] transition-colors font-mono"
                     />
                     <p className="text-[11px] text-muted-foreground/60 mt-1">
-                      Paste the YouTube live/share URL or just the video ID.
-                    </p>
+                        Paste the YouTube live/share URL or just the video ID.
+                      </p>
+                    </div>
+                  <div>
+                    <label className="block text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1.5">
+                      Backup Stream 1
+                    </label>
+                    <input
+                      value={newStream.backup_youtube_video_id_1}
+                      onChange={(e) => setNewStream((p) => ({ ...p, backup_youtube_video_id_1: e.target.value }))}
+                      placeholder="Optional YouTube live URL or video ID"
+                      className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-[oklch(0.75_0.12_85)] transition-colors font-mono"
+                    />
                   </div>
-                </div>
+                  <div>
+                    <label className="block text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1.5">
+                      Backup Stream 2
+                    </label>
+                    <input
+                      value={newStream.backup_youtube_video_id_2}
+                      onChange={(e) => setNewStream((p) => ({ ...p, backup_youtube_video_id_2: e.target.value }))}
+                      placeholder="Optional YouTube live URL or video ID"
+                      className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-[oklch(0.75_0.12_85)] transition-colors font-mono"
+                    />
+                  </div>
+                  </div>
                 <div>
                   <label className="block text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1.5">
                     Description
@@ -410,10 +599,11 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                           </span>
                         )}
                       </div>
-                      {stream.description && (
-                        <p className="text-sm text-muted-foreground mt-1.5">{stream.description}</p>
-                      )}
-                    </div>
+                        {stream.description && (
+                          <p className="text-sm text-muted-foreground mt-1.5">{stream.description}</p>
+                        )}
+                      {renderStreamLinkEditor(stream)}
+                      </div>
 
                     {/* Go Live / End Stream / Refresh buttons */}
                     <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">

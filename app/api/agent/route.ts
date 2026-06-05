@@ -22,8 +22,8 @@ export async function GET(request: NextRequest) {
       },
       stream: {
         'GET /api/agent/stream':   'List all streams (most recent first)',
-        'POST /api/agent/stream':  'Create a new stream. Body: { title, youtube_video_id, description?, setlist?, is_live? }. youtube_video_id accepts a YouTube URL or raw video ID.',
-        'PATCH /api/agent/stream': 'Update a stream. Body: { stream_id, is_live?, youtube_video_id?, title?, description?, setlist?, stream_start_utc? }. youtube_video_id accepts a YouTube URL or raw video ID.',
+        'POST /api/agent/stream':  'Create a new stream. Body: { title, youtube_video_id, backup_youtube_video_id_1?, backup_youtube_video_id_2?, description?, setlist?, is_live? }. YouTube fields accept a URL or raw video ID.',
+        'PATCH /api/agent/stream': 'Update a stream. Body: { stream_id, is_live?, youtube_video_id?, backup_youtube_video_id_1?, backup_youtube_video_id_2?, title?, description?, setlist?, stream_start_utc? }. Blank/null backup fields clear backups.',
         'DELETE /api/agent/stream': 'Delete a stream. Body: { stream_id }',
       },
       setlist: {

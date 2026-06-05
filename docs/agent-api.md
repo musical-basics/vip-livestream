@@ -23,7 +23,7 @@ anything here ever disagrees with those responses, trust the live response.
 
 Most write actions need a `stream_id` or `member_id`. Get them first:
 
-- `GET /api/agent/status` -> the current/most-recent stream (`id`, `title`, `is_live`, `youtube_video_id`) plus member counts. **Start here.**
+- `GET /api/agent/status` -> the current/most-recent stream (`id`, `title`, `is_live`, `youtube_video_id`, backup YouTube IDs) plus member counts. **Start here.**
 - `GET /api/agent/stream` -> every stream, newest first.
 - `GET /api/agent/members` -> every member with their `id`, `email`, moderator/ban flags, and login credentials.
 
@@ -130,18 +130,21 @@ which re-stamps the start time. To restart fresh on a NEW video, create one:
 ```bash
 curl -X POST https://vip.musicalbasics.com/api/agent/stream \
   -H "Authorization: Bearer $AGENT_API_KEY" -H "Content-Type: application/json" \
-  -d '{ "title": "VIP Livestream", "youtube_video_id": "https://youtu.be/XXXX", "is_live": true }'
+  -d '{ "title": "VIP Livestream", "youtube_video_id": "https://youtu.be/MAINID", "backup_youtube_video_id_1": "https://youtu.be/BACKUP1ID", "backup_youtube_video_id_2": "https://youtu.be/BACKUP2ID", "is_live": true }'
 ```
 
 ### Change the YouTube watch link
 
-`youtube_video_id` accepts a full YouTube URL or a raw video ID. Updating it
-broadcasts a refresh so connected viewers pick up the new video automatically.
+`youtube_video_id`, `backup_youtube_video_id_1`, and
+`backup_youtube_video_id_2` accept a full YouTube URL or a raw video ID.
+Updating any of them broadcasts a refresh so connected viewers pick up the new
+stream source selector automatically. Send `null` or `""` for a backup field to
+clear it.
 
 ```bash
 curl -X PATCH https://vip.musicalbasics.com/api/agent/stream \
   -H "Authorization: Bearer $AGENT_API_KEY" -H "Content-Type: application/json" \
-  -d '{ "stream_id": "<uuid>", "youtube_video_id": "https://www.youtube.com/watch?v=XXXX" }'
+  -d '{ "stream_id": "<uuid>", "youtube_video_id": "https://youtu.be/MAINID", "backup_youtube_video_id_1": "https://youtu.be/BACKUP1ID", "backup_youtube_video_id_2": null }'
 ```
 
 ### Edit the programme / setlist
@@ -183,12 +186,13 @@ All paths are under `https://vip.musicalbasics.com/api/agent`.
 | Method | Path | Body / Query | Notes |
 | --- | --- | --- | --- |
 | GET | `/stream` | - | List all streams, newest first. |
-| POST | `/stream` | `{ title, youtube_video_id, description?, setlist?, is_live? }` | Create. `youtube_video_id` = URL or raw ID. `is_live: true` ends other live streams. |
-| PATCH | `/stream` | `{ stream_id, is_live?, youtube_video_id?, title?, description?, setlist?, stream_start_utc? }` | Update / go live / end / change video. Broadcasts a refresh to viewers. |
+| POST | `/stream` | `{ title, youtube_video_id, backup_youtube_video_id_1?, backup_youtube_video_id_2?, description?, setlist?, is_live? }` | Create. YouTube fields accept URLs or raw IDs. `is_live: true` ends other live streams. |
+| PATCH | `/stream` | `{ stream_id, is_live?, youtube_video_id?, backup_youtube_video_id_1?, backup_youtube_video_id_2?, title?, description?, setlist?, stream_start_utc? }` | Update / go live / end / change stream sources. Broadcasts a refresh to viewers. |
 | DELETE | `/stream` | `{ stream_id }` | Delete a stream and its chat/comments/tips (cascade). |
 
 Notes:
 - Going live (`is_live: true`) auto-stamps `stream_start_utc` and ends any other live stream.
+- The viewer selector uses `youtube_video_id` as Main Stream, plus `backup_youtube_video_id_1` and `backup_youtube_video_id_2`.
 - `setlist` here overrides the programme **for that one stream**; for the global programme use the setlist API instead.
 
 ### Members & moderators

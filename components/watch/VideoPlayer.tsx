@@ -7,6 +7,7 @@ import { Loader2, WifiOff, Clock, Play, Pause, Volume2 } from 'lucide-react'
 interface VideoPlayerProps {
   stream: Stream | null
   fill?: boolean
+  videoId?: string | null
 }
 
 type PlayerStatus = 'loading' | 'ready' | 'offline'
@@ -50,8 +51,8 @@ declare global {
   }
 }
 
-export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) {
-  const videoId = stream?.youtube_video_id
+export default function VideoPlayer({ stream, fill = false, videoId: selectedVideoId }: VideoPlayerProps) {
+  const videoId = selectedVideoId ?? stream?.youtube_video_id
   const playerRef = useRef<YouTubePlayer | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const playerElementRef = useRef<HTMLDivElement>(null)
@@ -179,7 +180,7 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
         playerRef.current = null
       }
     }
-  }, [hasLiveVideo, initPlayer, stream?.youtube_video_id])
+  }, [hasLiveVideo, initPlayer, videoId])
 
   if (!hasLiveVideo) {
     return (

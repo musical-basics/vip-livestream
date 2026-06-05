@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase-server'
 import { fetchYouTubeVideoMetadata } from '@/lib/youtube-metadata'
 import { createClient } from '@supabase/supabase-js'
+import { getAvailableStreamSources } from '@/lib/stream-sources'
 
 async function broadcastStreamStatus(
   streamId: string,
@@ -54,10 +55,37 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, message: 'No active live stream to sync.' })
   }
 
-  // Fetch real-time status from YouTube (runs once per minute in the background)
-  const metadata = await fetchYouTubeVideoMetadata(stream.youtube_video_id)
+  // Fetch real-time status from YouTube (runs once per minute in the background).
+  // If the main source ended but a backup is still waiting/live/unknown, keep
+  // the event active so viewers can switch over.
+  const checkedSources: Array<{
+    source: string
+    label: string
+    youtube_video_id: string
+    broadcast_status: string
+  }> = []
+  let activeSource: { id: string; label: string; videoId: string } | null = null
 
-  if (metadata.broadcastStatus === 'ended') {
+  for (const source of getAvailableStreamSources(stream)) {
+    const metadata = await fetchYouTubeVideoMetadata(source.videoId)
+    checkedSources.push({
+      source: source.id,
+      label: source.label,
+      youtube_video_id: source.videoId,
+      broadcast_status: metadata.broadcastStatus,
+    })
+
+    if (metadata.broadcastStatus !== 'ended') {
+      activeSource = {
+        id: source.id,
+        label: source.label,
+        videoId: source.videoId,
+      }
+      break
+    }
+  }
+
+  if (!activeSource) {
     console.log(`[Cron Sync] Stream ${stream.id} ended on YouTube. Deactivating in database.`)
 
     // Deactivate the stream in the database
@@ -75,16 +103,19 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      message: 'Detected ended YouTube stream. Marked offline in DB.',
+      message: 'Detected ended YouTube stream sources. Marked offline in DB.',
       stream_id: stream.id,
       youtube_video_id: stream.youtube_video_id,
+      checked_sources: checkedSources,
     })
   }
 
   return NextResponse.json({
     ok: true,
     message: 'Active stream checked.',
-    broadcast_status: metadata.broadcastStatus,
+    active_source: activeSource.id,
+    broadcast_status: checkedSources.at(-1)?.broadcast_status ?? 'unknown',
+    checked_sources: checkedSources,
     stream_id: stream.id,
     youtube_video_id: stream.youtube_video_id,
   })
