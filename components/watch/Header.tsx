@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import type { Member, Stream } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { isAdmin, roleBadge } from '@/lib/roles'
-import { LogOut, Radio, Settings, Film } from 'lucide-react'
+import { LogOut, Radio, Settings, Film, ScrollText, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface HeaderProps {
@@ -92,14 +92,32 @@ export default function Header({ member, stream }: HeaderProps) {
           <span className="hidden sm:inline">Recordings</span>
         </a>
         {isAdmin(member) && (
-          <a
-            href="/admin"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-white/8"
-            title="Admin panel"
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Admin</span>
-          </a>
+          <>
+            <a
+              href="/logs"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-white/8"
+              title="Login logs"
+            >
+              <ScrollText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Logs</span>
+            </a>
+            <a
+              href="/analytics"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-white/8"
+              title="Analytics"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Analytics</span>
+            </a>
+            <a
+              href="/admin"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-white/8"
+              title="Admin panel"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Admin</span>
+            </a>
+          </>
         )}
         <Button
           variant="ghost"
