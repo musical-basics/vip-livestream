@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { formatDistanceToNow } from 'date-fns'
@@ -52,6 +52,28 @@ export default function ChatMessageRow({
 }: ChatMessageRowProps) {
   const [modMenuPosition, setModMenuPosition] = useState<{ x: number; y: number } | null>(null)
   const [isActing, setIsActing] = useState(false)
+
+  useEffect(() => {
+    if (!modMenuPosition) return
+
+    function handleGlobalClose(e: Event) {
+      if ((e.target as Element).closest('.mod-menu-container')) {
+        return
+      }
+      setModMenuPosition(null)
+    }
+
+    const timer = setTimeout(() => {
+      window.addEventListener('pointerdown', handleGlobalClose)
+      window.addEventListener('contextmenu', handleGlobalClose)
+    }, 0)
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('pointerdown', handleGlobalClose)
+      window.removeEventListener('contextmenu', handleGlobalClose)
+    }
+  }, [modMenuPosition])
 
   const isMod = currentMember.is_moderator
   const isOwn = message.member_id === currentMember.id
@@ -256,7 +278,7 @@ function ModMenu({
 }) {
   return (
     <div
-      className="fixed z-50 glass rounded-xl shadow-xl p-1 min-w-[178px] border border-white/10"
+      className="mod-menu-container fixed z-50 glass rounded-xl shadow-xl p-1 min-w-[178px] border border-white/10"
       style={{ left: position.x, top: position.y }}
     >
       <p className="text-[10px] text-muted-foreground px-2 py-1 tracking-widest uppercase">

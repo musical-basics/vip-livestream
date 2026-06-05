@@ -12,6 +12,7 @@ import TipButton from './TipButton'
 import EmojiOverlay from './EmojiOverlay'
 import Header from './Header'
 import TipBanner from './TipBanner'
+import ConcertAnnouncementDialog from './ConcertAnnouncementDialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MessageSquare, Music2, MessageCircle } from 'lucide-react'
 
@@ -105,6 +106,7 @@ export default function WatchPageClient({
 }: WatchPageClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const showConcertAnnouncement = searchParams.get('welcome') === '1'
 
   const [floatingEmojis, setFloatingEmojis] = useState<Array<{ id: string; emoji: string; x: number }>>([])
   const [tipBanner, setTipBanner] = useState<{ name: string; amount: number; message?: string } | null>(
@@ -293,6 +295,10 @@ export default function WatchPageClient({
     return () => window.clearTimeout(timeout)
   }, [searchParams, router])
 
+  const closeConcertAnnouncement = useCallback(() => {
+    router.replace('/watch')
+  }, [router])
+
   function addFloatingEmoji(emoji: string) {
     const id = `${Date.now()}-${Math.random()}`
     const x  = 10 + Math.random() * 80
@@ -321,6 +327,10 @@ export default function WatchPageClient({
           onClose={() => setTipBanner(null)}
         />
       )}
+      <ConcertAnnouncementDialog
+        open={showConcertAnnouncement}
+        onClose={closeConcertAnnouncement}
+      />
 
       {/* ── Main layout ───────────────────────────────── */}
       <div ref={mainLayoutRef} className="flex flex-1 flex-col gap-0 lg:min-h-0 lg:flex-row lg:overflow-hidden">

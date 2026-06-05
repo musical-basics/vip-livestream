@@ -21,5 +21,5 @@ export async function loginAction(formData: FormData) {
   }
 
   await setSession(member.id)
-  redirect('/watch')
+  redirect('/watch?welcome=1')
 }
