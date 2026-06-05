@@ -2,19 +2,19 @@
 /**
  * Email livestream access credentials to all livestream ticket-holders.
  *
- * For each real member (test accounts excluded) it:
- *   1. assigns a fresh, easy-to-type 6-letter lowercase password,
- *   2. writes it to vip_livestream.members.password_token,
- *   3. emails them their login email + password via Resend.
+ * For each real member (test accounts excluded) it emails their current
+ * login email + assigned password via Resend. Existing passwords are reused
+ * by default so previously emailed links keep working.
  *
  * SAFE BY DEFAULT: dry-run unless --apply is passed. Dry-run writes nothing
- * and sends nothing:it prints exactly what would happen (with sample passwords).
+ * and sends nothing:it prints exactly what would happen.
  *
  * Usage:
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs                 # dry-run (default)
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --only=you@x.com  # restrict to one/few (comma-sep)
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --only=you@x.com --apply  # real test send to yourself
- *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --apply         # rotate + send to everyone
+ *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --apply         # send current credentials to everyone
+ *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --apply --rotate # rotate + send to everyone
  *
  * Required env (.env.local):
  *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY
@@ -29,6 +29,7 @@ const APPLY = process.argv.includes("--apply");
 // --no-send: with --apply, rotate the password in the DB but do NOT email anyone.
 // Useful for handing yourself one real credential to test login.
 const NO_SEND = process.argv.includes("--no-send");
+const ROTATE = process.argv.includes("--rotate") || NO_SEND;
 const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const ONLY = onlyArg
   ? new Set(onlyArg.slice("--only=".length).split(",").map((s) => s.trim().toLowerCase()))
@@ -205,7 +206,8 @@ async function main() {
 
   const usedPasswords = new Set(all.map((m) => m.password_token).filter(Boolean));
 
-  console.log(`Mode:        ${APPLY ? "APPLY (rotating passwords + sending)" : "DRY-RUN (no writes, no sends)"}`);
+  const applyMode = ROTATE ? "rotating passwords + sending" : "sending current passwords";
+  console.log(`Mode:        ${APPLY ? `APPLY (${applyMode})` : "DRY-RUN (no writes, no sends)"}`);
   console.log(`From:        ${EMAIL_FROM}`);
   console.log(`Reply-To:    ${REPLY_TO}`);
   console.log(`Login URL:   ${APP_URL}`);
@@ -218,16 +220,22 @@ async function main() {
   const failures = [];
 
   for (const m of recipients) {
-    const password = uniquePassword(usedPasswords);
+    const shouldGeneratePassword = ROTATE || !m.password_token;
+    const password = shouldGeneratePassword ? uniquePassword(usedPasswords) : m.password_token;
     if (!APPLY) {
-      console.log(`  would email  ${m.email.padEnd(34)} pw=${password}`);
+      const action = shouldGeneratePassword ? "would generate+email" : "would email";
+      const displayPassword = shouldGeneratePassword ? password : "<existing>";
+      console.log(`  ${action}  ${m.email.padEnd(34)} pw=${displayPassword}`);
       continue;
     }
     try {
-      // Rotate first so the emailed password is the one stored in the DB.
-      const { error: upErr } = await supabase
-        .from("members").update({ password_token: password }).eq("id", m.id);
-      if (upErr) throw new Error(`DB update: ${upErr.message}`);
+      // Store generated passwords before sending so emailed credentials match
+      // the DB. Existing passwords are left alone by default.
+      if (shouldGeneratePassword) {
+        const { error: upErr } = await supabase
+          .from("members").update({ password_token: password }).eq("id", m.id);
+        if (upErr) throw new Error(`DB update: ${upErr.message}`);
+      }
 
       if (NO_SEND) {
         console.log(`  rotated (no email)  ${m.email.padEnd(34)} pw=${password}`);
@@ -249,7 +257,7 @@ async function main() {
   if (APPLY) {
     console.log(`\nDone. Sent ${sent}/${recipients.length}.`);
     if (failures.length) {
-      console.log(`\n⚠️  ${failures.length} failure(s):password was rotated but email did not send.`);
+      console.log(`\n⚠️  ${failures.length} failure(s):password may have been updated but email did not send.`);
       console.log(`   Re-run for just these: --only=${failures.map((f) => f.email).join(",")}`);
       failures.forEach((f) => console.log(`   ${f.email}  pw=${f.password}  (${f.error})`));
     }
