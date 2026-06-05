@@ -56,7 +56,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
   {
     id: '4n',
     piece: 'Torrent Étude (Nightmare)',
-    composer: 'after Frédéric Chopin',
+    composer: 'Frédéric Chopin, arr. Lionel Yu',
     performer: 'Lionel Yu',
     duration: '~4 min',
     notes: "'Nightmare' arrangement. Solo piano with electronic backing.",
@@ -65,7 +65,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
   {
     id: '5',
     piece: 'Beethoven Virus',
-    composer: 'after Ludwig van Beethoven',
+    composer: 'Ludwig van Beethoven, arr. Lionel Yu',
     performer: 'Lionel Yu, with violin & cello (trio)',
     duration: '~4.5 min',
     notes: 'Trio arrangement.',
@@ -74,7 +74,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
   {
     id: '6',
     piece: 'Canon in Dream',
-    composer: 'after Johann Pachelbel',
+    composer: 'Johann Pachelbel, arr. Lionel Yu',
     composerYears: '1653-1706',
     performer: 'Lionel Yu',
     duration: '~4.5 min',
@@ -161,7 +161,7 @@ export const DEFAULT_SETLIST: SetlistItem[] = [
   {
     id: 'e3',
     piece: 'Still D.R.E.',
-    composer: 'after Dr. Dre',
+    composer: 'Dr. Dre, arr. Lionel Yu',
     performer: 'Lionel Yu',
     duration: '~3.5 min',
     notes: 'Encore. Electronic arrangement. Solo piano with backing track.',
