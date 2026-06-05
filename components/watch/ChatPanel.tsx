@@ -9,7 +9,7 @@ import DisplayNameEditor from './DisplayNameEditor'
 import { Button } from '@/components/ui/button'
 import { Loader2, Send, Smile, ChevronUp, Users, Pin, X } from 'lucide-react'
 import EmojiOverlay from './EmojiOverlay'
-import { canModerateChat } from '@/lib/roles'
+import { canModerateChat, roleLabel } from '@/lib/roles'
 
 const PAGE_SIZE = 50
 const MAX_MESSAGES_IN_MEMORY = 300
@@ -412,7 +412,7 @@ export default function ChatPanel({
                 message={msg}
                 currentMember={member}
                 senderBadges={sender?.access_badges}
-                senderIsModerator={!!(sender?.is_moderator || sender?.is_admin)}
+                senderRole={roleLabel(sender)}
                 isMuted={mutedMessageIds.has(msg.id)}
                 streamId={stream?.id}
                 onDeleted={(messageId) =>

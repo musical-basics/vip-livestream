@@ -16,7 +16,7 @@ interface ChatMessageRowProps {
   message: ChatMessage
   currentMember: Member
   senderBadges?: string[]
-  senderIsModerator: boolean
+  senderRole: 'ADMIN' | 'MOD' | null
   isMuted: boolean
   isPinned: boolean
   streamId: string | undefined
@@ -49,7 +49,7 @@ export default function ChatMessageRow({
   message,
   currentMember,
   senderBadges,
-  senderIsModerator,
+  senderRole,
   isMuted,
   isPinned,
   streamId,
@@ -162,7 +162,12 @@ export default function ChatMessageRow({
   function renderSenderBadges() {
     return (
       <>
-        {senderIsModerator && (
+        {senderRole === 'ADMIN' && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded border border-[oklch(0.8_0.15_85)/50] text-[oklch(0.82_0.15_85)] bg-[oklch(0.8_0.15_85)/15] tracking-wide font-medium">
+            ADMIN
+          </span>
+        )}
+        {senderRole === 'MOD' && (
           <span className="text-[9px] px-1.5 py-0.5 rounded border border-[oklch(0.75_0.12_85)/35] text-[oklch(0.78_0.13_85)] bg-[oklch(0.75_0.12_85)/10] tracking-wide">
             MOD
           </span>
