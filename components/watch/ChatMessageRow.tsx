@@ -5,7 +5,7 @@ import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { canModerateChat } from '@/lib/roles'
 import { formatDistanceToNow } from 'date-fns'
-import { MoreHorizontal, Trash2, Clock, Smile } from 'lucide-react'
+import { MoreHorizontal, Trash2, Clock, Smile, Pin } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -18,9 +18,11 @@ interface ChatMessageRowProps {
   senderBadges?: string[]
   senderIsModerator: boolean
   isMuted: boolean
+  isPinned: boolean
   streamId: string | undefined
   onDeleted: (messageId: string) => void
   onReacted: (messageId: string, reactions: Record<string, string[]>) => void
+  onPinToggle: (message: ChatMessage) => void
 }
 
 const TIMEOUT_OPTIONS = [
@@ -49,9 +51,11 @@ export default function ChatMessageRow({
   senderBadges,
   senderIsModerator,
   isMuted,
+  isPinned,
   streamId,
   onDeleted,
   onReacted,
+  onPinToggle,
 }: ChatMessageRowProps) {
   const [modMenuPosition, setModMenuPosition] = useState<{ x: number; y: number } | null>(null)
   const [isActing, setIsActing] = useState(false)
@@ -88,7 +92,7 @@ export default function ChatMessageRow({
     e.stopPropagation()
     setModMenuPosition({
       x: Math.min(e.clientX, window.innerWidth - 210),
-      y: Math.min(e.clientY, window.innerHeight - (isMod ? 280 : 100)),
+      y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
     })
   }
 
@@ -233,9 +237,11 @@ export default function ChatMessageRow({
             isActing={isActing}
             currentMember={currentMember}
             reactions={message.reactions}
+            isPinned={isPinned}
             onReact={handleToggleReaction}
             onDelete={handleMuteMessage}
             onTimeout={handleTimeout}
+            onPinToggle={() => onPinToggle(message)}
           />
         )}
       </div>
@@ -262,7 +268,7 @@ export default function ChatMessageRow({
                   ? null
                   : {
                       x: Math.min(e.clientX, window.innerWidth - 210),
-                      y: Math.min(e.clientY, window.innerHeight - (isMod ? 280 : 100)),
+                      y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
                     }
               )
             }}
@@ -297,9 +303,11 @@ export default function ChatMessageRow({
             isActing={isActing}
             currentMember={currentMember}
             reactions={message.reactions}
+            isPinned={isPinned}
             onReact={handleToggleReaction}
             onDelete={handleMuteMessage}
             onTimeout={handleTimeout}
+            onPinToggle={() => onPinToggle(message)}
           />
         )}
       </div>
@@ -324,7 +332,7 @@ export default function ChatMessageRow({
                 ? null
                 : {
                     x: Math.min(e.clientX, window.innerWidth - 210),
-                    y: Math.min(e.clientY, window.innerHeight - (isMod ? 280 : 100)),
+                    y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
                   }
             )
           }}
@@ -362,9 +370,11 @@ export default function ChatMessageRow({
           isActing={isActing}
           currentMember={currentMember}
           reactions={message.reactions}
+          isPinned={isPinned}
           onReact={handleToggleReaction}
           onDelete={handleMuteMessage}
           onTimeout={handleTimeout}
+          onPinToggle={() => onPinToggle(message)}
         />
       )}
     </div>
@@ -377,18 +387,22 @@ function ModMenu({
   isActing,
   currentMember,
   reactions,
+  isPinned,
   onReact,
   onDelete,
   onTimeout,
+  onPinToggle,
 }: {
   position: { x: number; y: number }
   isOwn: boolean
   isActing: boolean
   currentMember: Member
   reactions: Record<string, string[]> | null
+  isPinned: boolean
   onReact: (emoji: string) => void
   onDelete: () => void
   onTimeout: (minutes: number | null) => void
+  onPinToggle: () => void
 }) {
   const REACTION_EMOJIS = ['❤️', '👏', '🔥', '🎹', '👍', '😂']
   const isMod = canModerateChat(currentMember)
@@ -427,11 +441,19 @@ function ModMenu({
             Mod Actions
           </p>
           <button
+            onClick={onPinToggle}
+            disabled={isActing}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 rounded-lg transition-colors text-left text-foreground/80"
+          >
+            <Pin className="w-3.5 h-3.5 text-muted-foreground" />
+            {isPinned ? 'Unpin message' : 'Pin message'}
+          </button>
+          <button
             onClick={onDelete}
             disabled={isActing}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-destructive/15 rounded-lg transition-colors text-left text-destructive/90"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-3.5 h-3.5" />
             Delete chat
           </button>
           {!isOwn && (
@@ -444,7 +466,7 @@ function ModMenu({
                   disabled={isActing}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-destructive/20 rounded-lg transition-colors text-left text-destructive/80"
                 >
-                  <Clock className="w-3 h-3" />
+                  <Clock className="w-3.5 h-3.5" />
                   Timeout {opt.label}
                 </button>
               ))}

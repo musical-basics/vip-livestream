@@ -57,6 +57,7 @@ export interface Database {
           setlist: Json | null
           description: string | null
           created_at: string
+          pinned_message: Json | null
         }
         Insert: {
           id?: string
@@ -67,6 +68,7 @@ export interface Database {
           setlist?: Json | null
           description?: string | null
           created_at?: string
+          pinned_message?: Json | null
         }
         Update: {
           id?: string
@@ -77,6 +79,7 @@ export interface Database {
           setlist?: Json | null
           description?: string | null
           created_at?: string
+          pinned_message?: Json | null
         }
       }
       chat_messages: {

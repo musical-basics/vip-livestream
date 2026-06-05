@@ -7,11 +7,20 @@ import ChatMessageRow from './ChatMessageRow'
 import EmojiPicker from './EmojiPicker'
 import DisplayNameEditor from './DisplayNameEditor'
 import { Button } from '@/components/ui/button'
-import { Loader2, Send, Smile, ChevronUp, Users } from 'lucide-react'
+import { Loader2, Send, Smile, ChevronUp, Users, Pin, X } from 'lucide-react'
 import EmojiOverlay from './EmojiOverlay'
+import { canModerateChat } from '@/lib/roles'
 
 const PAGE_SIZE = 50
+const MAX_MESSAGES_IN_MEMORY = 300
+const AUTO_SCROLL_THRESHOLD_PX = 96
 const textareaAutoSizeStyle: CSSProperties & { fieldSizing?: string } = { fieldSizing: 'content' }
+
+function appendMessage(messages: ChatMessage[], message: ChatMessage) {
+  if (messages.find((existing) => existing.id === message.id)) return messages
+  const next = [...messages, message]
+  return next.length > MAX_MESSAGES_IN_MEMORY ? next.slice(-MAX_MESSAGES_IN_MEMORY) : next
+}
 
 interface ChatPanelProps {
   member: Member
@@ -44,6 +53,13 @@ export default function ChatPanel({
   const [displayName, setDisplayName] = useState(member.display_name || member.name)
   const [mutedMessageIds, setMutedMessageIds] = useState<Set<string>>(new Set())
   const [chatFloatingEmojis, setChatFloatingEmojis] = useState<Array<{ id: string; emoji: string; x: number; delay: number }>>([])
+  const [pinnedMessage, setPinnedMessage] = useState<ChatMessage | null>(
+    () => (stream?.pinned_message as unknown as ChatMessage) || null
+  )
+
+  useEffect(() => {
+    setPinnedMessage((stream?.pinned_message as unknown as ChatMessage) || null)
+  }, [stream?.pinned_message])
 
   const spawnEmojiBurst = useCallback((emoji: string, count = 6) => {
     setChatFloatingEmojis((prev) => {
@@ -67,6 +83,8 @@ export default function ChatPanel({
   }, [])
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const shouldAutoScrollRef = useRef(true)
+  const scrollFrameRef = useRef<number | null>(null)
   const supabase = useMemo(() => createClient(), [])
   const memberById = useMemo(() => {
     const map = new Map(memberDirectory.map((directoryMember) => [directoryMember.id, directoryMember]))
@@ -76,14 +94,35 @@ export default function ChatPanel({
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
+    if (!shouldAutoScrollRef.current) return
     const container = scrollRef.current
     if (!container) return
-    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+
+    if (scrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollFrameRef.current)
+    }
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
+      scrollFrameRef.current = null
+    })
   }, [])
 
   useEffect(() => {
     scrollToBottom()
   }, [messages.length, scrollToBottom])
+
+  useEffect(() => () => {
+    if (scrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollFrameRef.current)
+    }
+  }, [])
+
+  const handleScroll = useCallback(() => {
+    const container = scrollRef.current
+    if (!container) return
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    shouldAutoScrollRef.current = distanceFromBottom < AUTO_SCROLL_THRESHOLD_PX
+  }, [])
 
   // Realtime subscriptions
   useEffect(() => {
@@ -93,10 +132,7 @@ export default function ChatPanel({
       .channel(`stream:${stream.id}`)
       .on('broadcast', { event: 'new_message' }, ({ payload }) => {
         const msg = payload as ChatMessage
-        setMessages((prev) => {
-          if (prev.find((m) => m.id === msg.id)) return prev
-          return [...prev, msg]
-        })
+        setMessages((prev) => appendMessage(prev, msg))
         if (!msg.content && msg.emoji) {
           if (msg.emoji === '👏') {
             spawnEmojiBurst('👏', 5)
@@ -144,6 +180,10 @@ export default function ChatPanel({
           })
         )
       })
+      .on('broadcast', { event: 'pinned_message_updated' }, ({ payload }) => {
+        const { pinned_message } = payload as { pinned_message: ChatMessage | null }
+        setPinnedMessage(pinned_message)
+      })
       .on('broadcast', { event: 'tip_received' }, ({ payload }) => {
         onTipBanner(payload as { name: string; amount: number; message?: string })
       })
@@ -171,6 +211,7 @@ export default function ChatPanel({
     const oldestMsg = messages[0]
     if (!oldestMsg) return
 
+    shouldAutoScrollRef.current = false
     setIsLoadingMore(true)
     try {
       const { data } = await supabase
@@ -183,7 +224,10 @@ export default function ChatPanel({
         .limit(PAGE_SIZE)
 
       if (data && data.length > 0) {
-        setMessages((prev) => [...data.reverse(), ...prev])
+        setMessages((prev) => {
+          const next = [...data.reverse(), ...prev]
+          return next.length > MAX_MESSAGES_IN_MEMORY ? next.slice(0, MAX_MESSAGES_IN_MEMORY) : next
+        })
         setHasMore(data.length >= PAGE_SIZE)
         // Restore scroll position (don't jump to bottom)
         const container = scrollRef.current
@@ -201,9 +245,10 @@ export default function ChatPanel({
     }
   }
 
-  async function sendMessage(content?: string, emoji?: string) {
+  const sendMessage = useCallback(async (content?: string, emoji?: string) => {
     if (!stream?.id) return
     if (isMuted) return
+    if (isSending) return
     const msgContent = content ?? input.trim()
     if (!msgContent && !emoji) return
 
@@ -229,15 +274,13 @@ export default function ChatPanel({
       }
 
       if (data.message) {
-        setMessages((prev) => {
-          if (prev.find((message) => message.id === data.message.id)) return prev
-          return [...prev, data.message]
-        })
+        shouldAutoScrollRef.current = true
+        setMessages((prev) => appendMessage(prev, data.message))
       }
     } finally {
       setIsSending(false)
     }
-  }
+  }, [displayName, input, isMuted, isSending, stream?.id])
 
   function handleEmojiSelect(emoji: string) {
     setShowEmojiPicker(false)
@@ -257,7 +300,32 @@ export default function ChatPanel({
     setTimeout(() => {
       setApplauseCooldown(false)
     }, 1000)
-  }, [stream?.id, applauseCooldown, onEmojiReaction, spawnEmojiBurst])
+  }, [stream?.id, applauseCooldown, onEmojiReaction, sendMessage, spawnEmojiBurst])
+
+  const handlePinToggle = useCallback(async (msg: ChatMessage) => {
+    if (!stream?.id) return
+    const isCurrentlyPinned = pinnedMessage?.id === msg.id
+    const targetMessageId = isCurrentlyPinned ? null : msg.id
+
+    // Optimistic update
+    setPinnedMessage(isCurrentlyPinned ? null : msg)
+
+    try {
+      const res = await fetch('/api/mod/pin-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message_id: targetMessageId,
+          stream_id: stream.id,
+        }),
+      })
+      if (!res.ok) {
+        setPinnedMessage(pinnedMessage)
+      }
+    } catch {
+      setPinnedMessage(pinnedMessage)
+    }
+  }, [stream?.id, pinnedMessage])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -281,9 +349,35 @@ export default function ChatPanel({
         </div>
       </div>
 
+      {/* Pinned message banner */}
+      {pinnedMessage && (
+        <div className="flex items-start gap-2 border-b border-gold/20 bg-gold/5 px-4 py-2.5 text-xs animate-[slideInDown_0.2s_ease-out] relative z-10">
+          <Pin className="w-3.5 h-3.5 text-gold shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-gold/80 font-medium tracking-wide uppercase leading-none mb-1">
+              Pinned Message
+            </p>
+            <p className="text-foreground/90 font-medium truncate leading-normal">
+              <span className="font-semibold text-gold mr-1.5">{pinnedMessage.display_name}:</span>
+              {pinnedMessage.content || pinnedMessage.emoji}
+            </p>
+          </div>
+          {canModerateChat(member) && (
+            <button
+              onClick={() => handlePinToggle(pinnedMessage)}
+              className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+              title="Unpin message"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Messages */}
       <div
         ref={scrollRef}
+        onScroll={handleScroll}
         className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-3 space-y-1"
       >
         {/* Load more button */}
@@ -324,6 +418,8 @@ export default function ChatPanel({
                 onDeleted={(messageId) =>
                   setMessages((prev) => prev.filter((message) => message.id !== messageId))
                 }
+                isPinned={pinnedMessage?.id === msg.id}
+                onPinToggle={handlePinToggle}
                 onReacted={(messageId, reactions) => {
                   setMessages((prev) =>
                     prev.map((msg) => {
