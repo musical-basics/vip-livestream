@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase-server'
 import WatchPageClient from '@/components/watch/WatchPageClient'
-import type { Member, Stream } from '@/lib/database.types'
+import type { ChatMessage, Comment, Member, Stream } from '@/lib/database.types'
 
 export default async function WatchPage() {
   const member = await getSession()
@@ -10,17 +10,27 @@ export default async function WatchPage() {
 
   const supabase = createServiceClient()
 
-  // Get the most recent stream. maybeSingle() returns null (no error) when no rows exist.
-  const { data: existingStream } = await supabase
+  // Prefer an active stream. If none is live, fall back to the newest stream record.
+  const { data: liveStream } = await supabase
     .from('streams')
     .select('*')
+    .eq('is_live', true)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
+  const { data: newestStream } = liveStream
+    ? { data: null }
+    : await supabase
+        .from('streams')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
   // Auto-provision a default stream if none exists yet.
   // This ensures chat, comments, and the watch page work immediately on first visit.
-  const stream: Stream | null = existingStream ?? (
+  const stream: Stream | null = liveStream ?? newestStream ?? (
     await supabase
       .from('streams')
       .insert({
@@ -64,12 +74,15 @@ export default async function WatchPage() {
       ])
     : [{ data: [] }, { data: [] }, { data: null }, { data: [] }]
 
+  const initialMessages = [...((messagesRes.data ?? []) as ChatMessage[])].reverse()
+  const initialComments = (commentsRes.data ?? []) as Comment[]
+
   return (
     <WatchPageClient
       member={member}
       stream={stream}
-      initialMessages={((messagesRes.data as any[]) || []).reverse()}
-      initialComments={(commentsRes.data as any[]) || []}
+      initialMessages={initialMessages}
+      initialComments={initialComments}
       memberDirectory={(membersRes.data as Member[]) || []}
       isMuted={!!timeoutRes.data}
     />

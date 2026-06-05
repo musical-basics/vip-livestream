@@ -216,12 +216,22 @@ export default function WatchPageClient({
   useEffect(() => {
     if (!stream?.id) return
     const supabase = createClient()
-    const channel = supabase
-      .channel(`stream-status:${stream.id}`)
-      .on('broadcast', { event: 'stream_live' },  () => { router.refresh() })
-      .on('broadcast', { event: 'stream_ended' }, () => { router.refresh() })
+    const refresh = () => { router.refresh() }
+    const statusChannel = supabase
+      .channel('stream-status')
+      .on('broadcast', { event: 'stream_live' }, refresh)
+      .on('broadcast', { event: 'stream_ended' }, refresh)
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    const currentStreamChannel = supabase
+      .channel(`stream:${stream.id}`)
+      .on('broadcast', { event: 'stream_live' }, refresh)
+      .on('broadcast', { event: 'stream_ended' }, refresh)
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(statusChannel)
+      supabase.removeChannel(currentStreamChannel)
+    }
   }, [stream?.id, router])
 
   // Show tip success notification

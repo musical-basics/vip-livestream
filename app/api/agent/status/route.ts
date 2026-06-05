@@ -12,13 +12,14 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServiceClient()
 
-  const [streamRes, membersRes, messagesRes] = await Promise.all([
+  const [liveStreamRes, membersRes, messagesRes] = await Promise.all([
     supabase
       .from('streams')
       .select('id, title, is_live, youtube_video_id, stream_start_utc, created_at')
+      .eq('is_live', true)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single(),
+      .maybeSingle(),
     supabase
       .from('members')
       .select('*'),
@@ -27,7 +28,16 @@ export async function GET(request: NextRequest) {
       .select('id', { count: 'exact', head: true }),
   ])
 
-  const stream = streamRes.data
+  const newestStreamRes = liveStreamRes.data
+    ? { data: null }
+    : await supabase
+        .from('streams')
+        .select('id, title, is_live, youtube_video_id, stream_start_utc, created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+  const stream = liveStreamRes.data ?? newestStreamRes.data
   const members = membersRes.data ?? []
   const badgeCounts = Object.fromEntries(MEMBER_BADGES.map((badge) => [badge.id, 0]))
   members.forEach((member) => {

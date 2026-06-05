@@ -1,12 +1,25 @@
 import { NextRequest } from 'next/server'
 import { verifyAgentKey, agentUnauthorized } from '@/lib/agent-auth'
 import { createServiceClient } from '@/lib/supabase-server'
+import { extractYouTubeVideoId } from '@/lib/youtube'
 import { createClient } from '@supabase/supabase-js'
 
-function realtimeClient() {
-  return createClient(
+async function broadcastStreamStatus(streamId: string, isLive: boolean) {
+  const realtimeClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const payload = { stream_id: streamId, is_live: isLive }
+  const event = isLive ? 'stream_live' : 'stream_ended'
+
+  await Promise.all(
+    [`stream:${streamId}`, `stream-status:${streamId}`, 'stream-status'].map((topic) =>
+      realtimeClient.channel(topic).send({
+        type: 'broadcast',
+        event,
+        payload,
+      })
+    )
   )
 }
 
@@ -31,25 +44,46 @@ export async function GET(request: NextRequest) {
  * POST /api/agent/stream
  * Create a new stream.
  * Body: { title, youtube_video_id, description?, setlist?, is_live? }
+ * youtube_video_id may be a YouTube URL or raw video ID.
  */
 export async function POST(request: NextRequest) {
   if (!verifyAgentKey(request)) return agentUnauthorized()
 
   const body = await request.json()
   const { title, youtube_video_id, description, setlist, is_live } = body
+  const videoId = extractYouTubeVideoId(youtube_video_id ?? '')
 
-  if (!title || !youtube_video_id) {
-    return Response.json({ error: 'title and youtube_video_id are required' }, { status: 400 })
+  if (!title || !videoId) {
+    return Response.json({ error: 'title and valid youtube_video_id are required' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
   const { data: stream, error } = await supabase
     .from('streams')
-    .insert({ title, youtube_video_id, description, setlist, is_live: is_live ?? false })
+    .insert({
+      title,
+      youtube_video_id: videoId,
+      description,
+      setlist,
+      is_live: is_live ?? false,
+      ...(is_live === true && { stream_start_utc: new Date().toISOString() }),
+    })
     .select()
     .single()
 
-  if (error) return Response.json({ error: error.message }, { status: 500 })
+  if (error || !stream) {
+    return Response.json({ error: error?.message ?? 'Failed to create stream' }, { status: 500 })
+  }
+
+  if (is_live === true) {
+    await supabase
+      .from('streams')
+      .update({ is_live: false })
+      .neq('id', stream.id)
+      .eq('is_live', true)
+    await broadcastStreamStatus(stream.id, true)
+  }
+
   return Response.json({ ok: true, stream }, { status: 201 })
 }
 
@@ -57,6 +91,7 @@ export async function POST(request: NextRequest) {
  * PATCH /api/agent/stream
  * Update a stream. Can go live, end stream, change video, etc.
  * Body: { stream_id, is_live?, youtube_video_id?, title?, description?, setlist?, stream_start_utc? }
+ * youtube_video_id may be a YouTube URL or raw video ID.
  */
 export async function PATCH(request: NextRequest) {
   if (!verifyAgentKey(request)) return agentUnauthorized()
@@ -72,6 +107,12 @@ export async function PATCH(request: NextRequest) {
     if (key in rest) update[key] = rest[key]
   }
 
+  if ('youtube_video_id' in update) {
+    const videoId = extractYouTubeVideoId(String(update.youtube_video_id ?? ''))
+    if (!videoId) return Response.json({ error: 'valid youtube_video_id is required' }, { status: 400 })
+    update.youtube_video_id = videoId
+  }
+
   // Auto-stamp stream_start_utc when going live
   if (update.is_live === true && !update.stream_start_utc) {
     update.stream_start_utc = new Date().toISOString()
@@ -85,17 +126,21 @@ export async function PATCH(request: NextRequest) {
     .select()
     .single()
 
-  if (error) return Response.json({ error: error.message }, { status: 500 })
+  if (error || !stream) {
+    return Response.json({ error: error?.message ?? 'Failed to update stream' }, { status: 500 })
+  }
+
+  if (update.is_live === true) {
+    await supabase
+      .from('streams')
+      .update({ is_live: false })
+      .neq('id', stream_id)
+      .eq('is_live', true)
+  }
 
   // Broadcast go-live / stream-ended events to all connected clients
   if ('is_live' in update) {
-    const rt = realtimeClient()
-    const ch = rt.channel(`stream:${stream_id}`)
-    await ch.send({
-      type: 'broadcast',
-      event: update.is_live ? 'stream_live' : 'stream_ended',
-      payload: { stream_id, is_live: update.is_live },
-    })
+    await broadcastStreamStatus(stream_id, update.is_live === true)
   }
 
   return Response.json({ ok: true, stream })

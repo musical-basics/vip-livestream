@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Member, Stream } from '@/lib/database.types'
 import { MEMBER_BADGES, getMemberBadge, normalizeMemberBadges, type MemberBadgeId } from '@/lib/member-badges'
+import { extractYouTubeVideoId } from '@/lib/youtube'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -50,6 +51,12 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
   async function createStream() {
     if (!newStream.title || !newStream.youtube_video_id) return
     setLoadingId('new')
+    const videoId = extractYouTubeVideoId(newStream.youtube_video_id)
+    if (!videoId) {
+      alert('Please enter a valid YouTube video URL or video ID.')
+      setLoadingId(null)
+      return
+    }
 
     let parsedSetlist = null
     if (newStream.setlist.trim()) {
@@ -67,7 +74,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: newStream.title,
-        youtube_video_id: newStream.youtube_video_id,
+        youtube_video_id: videoId,
         description: newStream.description || null,
         setlist: parsedSetlist,
       }),
@@ -92,15 +99,18 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
       body: JSON.stringify({
         stream_id: stream.id,
         is_live: goLive,
-        stream_start_utc: goLive ? new Date().toISOString() : null,
+        ...(goLive && { stream_start_utc: new Date().toISOString() }),
       }),
     })
 
     if (res.ok) {
+      const { stream: updatedStream } = await res.json()
       setStreamList((prev) =>
         prev.map((s) =>
           s.id === stream.id
-            ? { ...s, is_live: goLive, stream_start_utc: goLive ? new Date().toISOString() : null }
+            ? updatedStream
+            : goLive
+              ? { ...s, is_live: false }
             : s
         )
       )
@@ -160,6 +170,10 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
   }
 
   const liveStream = streamList.find((s) => s.is_live)
+  const currentStream = liveStream ?? streamList[0] ?? null
+  const archivedStreams = currentStream
+    ? streamList.filter((stream) => stream.id !== currentStream.id)
+    : []
 
   return (
     <div className="min-h-screen">
@@ -242,16 +256,16 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                   </div>
                   <div>
                     <label className="block text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1.5">
-                      YouTube Video ID *
+                      YouTube URL or Video ID *
                     </label>
                     <input
                       value={newStream.youtube_video_id}
                       onChange={(e) => setNewStream((p) => ({ ...p, youtube_video_id: e.target.value }))}
-                      placeholder="dQw4w9WgXcQ"
+                      placeholder="https://youtube.com/live/bEF9k5bGM2c?feature=share"
                       className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-[oklch(0.75_0.12_85)] transition-colors font-mono"
                     />
                     <p className="text-[11px] text-muted-foreground/60 mt-1">
-                      From youtube.com/watch?v=<strong>THIS_PART</strong>
+                      Paste the YouTube live/share URL or just the video ID.
                     </p>
                   </div>
                 </div>
@@ -307,7 +321,14 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                   <p className="text-sm">No streams yet. Create one above.</p>
                 </div>
               )}
-              {streamList.map((stream) => (
+              {currentStream && (
+                <div className="pt-1">
+                  <p className="text-[10px] text-muted-foreground tracking-widest uppercase mb-2">
+                    Current Stream
+                  </p>
+                </div>
+              )}
+              {currentStream && [currentStream].map((stream) => (
                 <div key={stream.id} className={`glass rounded-2xl p-5 border ${stream.is_live ? 'border-red-500/30' : 'border-white/8'}`}>
                   <div className="flex items-start gap-4 flex-wrap">
                     <div className="flex-1 min-w-0">
@@ -367,6 +388,70 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : stream.is_live ? (
                         <><PowerOff className="w-3.5 h-3.5" /> End Stream</>
+                      ) : (
+                        <><Power className="w-3.5 h-3.5" /> Go Live</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {archivedStreams.length > 0 && (
+                <div className="pt-5">
+                  <p className="text-[10px] text-muted-foreground tracking-widest uppercase mb-2">
+                    Archive
+                  </p>
+                </div>
+              )}
+              {archivedStreams.map((stream) => (
+                <div key={stream.id} className="glass rounded-2xl p-5 border border-white/8 opacity-80">
+                  <div className="flex items-start gap-4 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3
+                          className="text-lg font-medium"
+                          style={{ fontFamily: "'Cormorant Garamond', serif" }}
+                        >
+                          {stream.title}
+                        </h3>
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground border-white/15">
+                          ARCHIVED
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        <span className="text-xs text-muted-foreground font-mono">
+                          ID: {stream.youtube_video_id}
+                        </span>
+                        <a
+                          href={`https://youtube.com/watch?v=${stream.youtube_video_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[oklch(0.75_0.12_85)] hover:underline flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          YouTube
+                        </a>
+                        {stream.stream_start_utc && (
+                          <span className="text-xs text-muted-foreground">
+                            Started {formatDistanceToNow(new Date(stream.stream_start_utc), { addSuffix: true })}
+                          </span>
+                        )}
+                      </div>
+                      {stream.description && (
+                        <p className="text-sm text-muted-foreground mt-1.5">{stream.description}</p>
+                      )}
+                    </div>
+                    <Button
+                      onClick={() => toggleLive(stream)}
+                      disabled={loadingId === stream.id}
+                      size="sm"
+                      className="rounded-xl shrink-0 flex items-center gap-2"
+                      style={{
+                        background: 'linear-gradient(135deg, oklch(0.60 0.22 25), oklch(0.45 0.18 10))',
+                        color: 'white',
+                      }}
+                    >
+                      {loadingId === stream.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
                         <><Power className="w-3.5 h-3.5" /> Go Live</>
                       )}
