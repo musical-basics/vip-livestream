@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type { Stream } from '@/lib/database.types'
-import { Loader2, WifiOff, Clock } from 'lucide-react'
+import { Loader2, WifiOff, Clock, Play, Pause } from 'lucide-react'
 
 interface VideoPlayerProps {
   stream: Stream | null
@@ -21,6 +21,7 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
   const containerRef = useRef<HTMLDivElement>(null)
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [playerState, setPlayerState] = useState<'loading' | 'ready' | 'offline'>('loading')
+  const [isPlaying, setIsPlaying] = useState(false)
 
   const syncPlayer = useCallback(async () => {
     if (!playerRef.current || !stream?.is_live) return
@@ -66,6 +67,7 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
               if (data.is_live && data.offset_seconds > 0) {
                 event.target.seekTo(data.offset_seconds, true)
                 event.target.playVideo()
+                setIsPlaying(true)
               }
             }
           } catch {}
@@ -73,18 +75,49 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
           // Start sync heartbeat every 30s
           syncIntervalRef.current = setInterval(syncPlayer, 30000)
         },
+        onStateChange: (event: any) => {
+          const playerStates = window.YT?.PlayerState
+          setIsPlaying(event.data === playerStates?.PLAYING || event.data === 1)
+        },
         onError: () => {
           setPlayerState('offline')
+          setIsPlaying(false)
         },
       },
     })
   }, [stream, syncPlayer])
 
+  const togglePlayback = useCallback(() => {
+    if (!playerRef.current || playerState !== 'ready') return
+
+    const playerStates = window.YT?.PlayerState
+    const currentState = playerRef.current.getPlayerState?.()
+    const playerIsPlaying =
+      currentState === playerStates?.PLAYING ||
+      currentState === playerStates?.BUFFERING ||
+      currentState === 1 ||
+      currentState === 3 ||
+      isPlaying
+
+    if (playerIsPlaying) {
+      playerRef.current.pauseVideo?.()
+      setIsPlaying(false)
+      return
+    }
+
+    playerRef.current.playVideo?.()
+    setIsPlaying(true)
+  }, [isPlaying, playerState])
+
   useEffect(() => {
     if (!stream?.youtube_video_id) {
       setPlayerState('offline')
+      setIsPlaying(false)
       return
     }
+
+    setPlayerState('loading')
+    setIsPlaying(false)
 
     // Load YouTube IFrame API
     if (window.YT?.Player) {
@@ -145,6 +178,22 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
 
       {/* YouTube embed container */}
       <div id="yt-player" className="w-full h-full" />
+
+      {playerState === 'ready' && (
+        <button
+          type="button"
+          onClick={togglePlayback}
+          aria-label={isPlaying ? 'Pause livestream' : 'Play livestream'}
+          title={isPlaying ? 'Pause livestream' : 'Play livestream'}
+          className="absolute left-4 top-4 z-20 flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/70 text-white shadow-lg shadow-black/30 backdrop-blur transition-colors hover:bg-black/85 focus:outline-none focus:ring-2 focus:ring-[oklch(0.75_0.12_85)]"
+        >
+          {isPlaying ? (
+            <Pause className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <Play className="ml-0.5 h-5 w-5" aria-hidden="true" />
+          )}
+        </button>
+      )}
     </div>
   )
 }
