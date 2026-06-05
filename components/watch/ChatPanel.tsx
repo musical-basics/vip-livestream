@@ -486,10 +486,13 @@ export default function ChatPanel({
   }, [streamId, pinnedMessage])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      if (cooldownRemaining > 0 && !canModerateChat(member)) return
-      sendMessage()
+    if (e.key === 'Enter') {
+      const isMobile = typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent)
+      if (isMobile || !e.shiftKey) {
+        e.preventDefault()
+        if (cooldownRemaining > 0 && !canModerateChat(member)) return
+        sendMessage()
+      }
     }
   }
 
@@ -632,6 +635,28 @@ export default function ChatPanel({
                 value={input}
                 onChange={(e) => {
                   const val = e.target.value
+                  const isMobile = typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent)
+
+                  if (isMobile && val.includes('\n')) {
+                    const cleaned = val.replace(/\n/g, '')
+                    if (cooldownRemaining > 0 && !canModerateChat(member)) {
+                      setInput(cleaned)
+                      if (streamId) {
+                        localStorage.setItem(`draft_chat_${streamId}`, cleaned)
+                      }
+                      return
+                    }
+                    if (cleaned.trim()) {
+                      sendMessage(cleaned)
+                    } else {
+                      setInput('')
+                      if (streamId) {
+                        localStorage.removeItem(`draft_chat_${streamId}`)
+                      }
+                    }
+                    return
+                  }
+
                   setInput(val)
                   if (streamId) {
                     localStorage.setItem(`draft_chat_${streamId}`, val)
