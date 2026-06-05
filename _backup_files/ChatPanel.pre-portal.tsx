@@ -134,7 +134,6 @@ interface ChatPanelProps {
   highlightNameEditor?: boolean
   topChatterRanks?: Map<string, number>
   chatterMessagesCountMap?: Map<string, number>
-  onSelectMemberId?: (id: string) => void
 }
 
 export default function ChatPanel({
@@ -148,7 +147,6 @@ export default function ChatPanel({
   highlightNameEditor = false,
   topChatterRanks,
   chatterMessagesCountMap,
-  onSelectMemberId,
 }: ChatPanelProps) {
   const streamId = stream?.id
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
@@ -204,7 +202,7 @@ export default function ChatPanel({
     if (!activeMenuMessageId) return
 
     function handleGlobalClose(e: Event) {
-      if (e.target instanceof Element && e.target.closest('.mod-menu-container')) {
+      if ((e.target as Element).closest('.mod-menu-container')) {
         return
       }
       setActiveMenuMessageId(null)
@@ -764,7 +762,6 @@ export default function ChatPanel({
                     isMenuOpen={activeMenuMessageId === msg.id}
                     activeMenuPosition={activeMenuMessageId === msg.id ? activeMenuPosition : null}
                     setActiveMenu={handleActiveMenuChange}
-                    onSelectMemberId={onSelectMemberId}
                   />
                 </div>
               )

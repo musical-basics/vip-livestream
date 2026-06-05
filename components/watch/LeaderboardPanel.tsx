@@ -24,6 +24,7 @@ interface LeaderboardPanelProps {
   isRefreshing: boolean
   error: string | null
   onRefresh: () => void
+  onSelectMemberId?: (id: string) => void
 }
 
 type ScopeType = 'current' | 'weekly' | 'monthly' | 'all-time'
@@ -36,6 +37,7 @@ export default function LeaderboardPanel({
   isRefreshing,
   error,
   onRefresh,
+  onSelectMemberId,
 }: LeaderboardPanelProps) {
   const [scope, setScope] = useState<ScopeType>('current')
   
@@ -209,10 +211,11 @@ export default function LeaderboardPanel({
             return (
               <div
                 key={chatter.member_id}
-                className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-150 group ${
+                onClick={() => onSelectMemberId?.(chatter.member_id)}
+                className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-150 group cursor-pointer active:scale-[0.98] ${
                   rank === 1
-                    ? 'border-amber-400/10 bg-amber-400/[0.02] hover:bg-amber-400/[0.04]'
-                    : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05]'
+                    ? 'border-amber-400/10 bg-amber-400/[0.02] hover:bg-amber-400/[0.06] hover:border-amber-400/30'
+                    : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/20'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">

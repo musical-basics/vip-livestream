@@ -14,7 +14,6 @@ import Header from './Header'
 import TipBanner from './TipBanner'
 import ConcertAnnouncementDialog from './ConcertAnnouncementDialog'
 import LeaderboardPanel from './LeaderboardPanel'
-import MemberProfileModal from './MemberProfileModal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MessageSquare, Music2, MessageCircle, RefreshCw, Trophy } from 'lucide-react'
 import { getStreamSources, type StreamSourceId } from '@/lib/stream-sources'
@@ -111,7 +110,6 @@ export default function WatchPageClient({
   const searchParams = useSearchParams()
   const router = useRouter()
   const showConcertAnnouncement = searchParams.get('welcome') === '1'
-  const [activeProfileMemberId, setActiveProfileMemberId] = useState<string | null>(null)
 
   const [floatingEmojis, setFloatingEmojis] = useState<Array<{ id: string; emoji: string; x: number }>>([])
   const [tipBanner, setTipBanner] = useState<{ name: string; amount: number; message?: string } | null>(
@@ -595,7 +593,6 @@ export default function WatchPageClient({
             isRefreshing={isLeaderboardRefreshing}
             error={leaderboardError}
             onRefresh={() => fetchCurrentLeaderboard(true)}
-            onSelectMemberId={setActiveProfileMemberId}
           />
         </TabsContent>
       </Tabs>
@@ -615,7 +612,6 @@ export default function WatchPageClient({
       highlightNameEditor={showConcertAnnouncement}
       topChatterRanks={topChatterRanks}
       chatterMessagesCountMap={topChatterMessagesCount}
-      onSelectMemberId={setActiveProfileMemberId}
     />
   )
 
@@ -818,12 +814,6 @@ export default function WatchPageClient({
           </div>
         </div>
       )}
-      <MemberProfileModal
-        open={!!activeProfileMemberId}
-        memberId={activeProfileMemberId}
-        streamId={stream?.id || null}
-        onClose={() => setActiveProfileMemberId(null)}
-      />
     </div>
   )
 }

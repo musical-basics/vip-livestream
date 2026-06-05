@@ -1,7 +1,6 @@
 'use client'
 
 import { memo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { canModerateChat, nameColor, ROLE_BADGE } from '@/lib/roles'
@@ -30,7 +29,6 @@ interface ChatMessageRowProps {
   isMenuOpen: boolean
   activeMenuPosition: { x: number; y: number } | null
   setActiveMenu: (messageId: string | null, position: { x: number; y: number } | null) => void
-  onSelectMemberId?: (id: string) => void
 }
 
 const TIMEOUT_OPTIONS = [
@@ -56,33 +54,17 @@ function ChatMessageRow({
   isMenuOpen,
   activeMenuPosition,
   setActiveMenu,
-  onSelectMemberId,
 }: ChatMessageRowProps) {
   const [isActing, setIsActing] = useState(false)
 
   const isMod = canModerateChat(currentMember)
   const isOwn = message.member_id === currentMember.id
   const color = nameColor(senderRole, senderBadges, senderColor)
-  const count = chatterMessagesCount || 0
-  const isLegend = count >= 100
-  const isGold = count >= 50 && count < 100
-  const isSilver = count >= 25 && count < 50
-  const isBronze = count >= 10 && count < 25
-
-  let textShadow = rank === 1 ? '0 0 8px oklch(0.75 0.12 85 / 0.35)' : undefined
-  if (isGold) {
-    textShadow = '0 0 8px oklch(0.75 0.12 85 / 0.45)'
-  } else if (isSilver) {
-    textShadow = '0 0 6px oklch(0.85 0.02 240 / 0.35)'
-  } else if (isBronze) {
-    textShadow = '0 0 5px oklch(0.60 0.08 70 / 0.35)'
-  }
-
   const nameStyle = {
-    color: isLegend ? undefined : color,
-    textShadow,
+    color,
+    textShadow: rank === 1 ? '0 0 8px oklch(0.75 0.12 85 / 0.35)' : undefined
   }
-  const nameClassName = `text-xs font-semibold cursor-pointer hover:underline select-none ${rank === 1 ? 'animate-[pulse_4s_infinite]' : ''} ${isLegend ? 'rainbow-chatter-name' : ''}`
+  const nameClassName = `text-xs font-semibold ${rank === 1 ? 'animate-[pulse_4s_infinite]' : ''}`
   const visibleBadges = normalizeMemberBadges(senderBadges)
 
   const relativeTime = useRelativeTime(message.created_at)
@@ -173,24 +155,19 @@ function ChatMessageRow({
   }
 
   function renderSenderBadges() {
-    const isGoldOrLegend = count >= 50
     return (
       <>
         {rank && rank >= 1 && rank <= 3 && (
           <Tooltip>
             <TooltipTrigger asChild>
               <span
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onSelectMemberId?.(message.member_id)
-                }}
-                className={`text-[9px] px-1.5 py-0.5 rounded border tracking-wide font-semibold flex items-center gap-1 shrink-0 cursor-pointer select-none outline-none hover:underline hover:scale-105 active:scale-95 transition-all ${
+                className={`text-[9px] px-1.5 py-0.5 rounded border tracking-wide font-semibold flex items-center gap-1 shrink-0 cursor-default select-none outline-none ${
                   rank === 1
                     ? 'border-amber-400/45 text-amber-300 bg-amber-400/10 shadow-sm shadow-amber-400/5'
                     : rank === 2
                     ? 'border-slate-300/40 text-slate-200 bg-slate-300/10'
                     : 'border-amber-700/45 text-amber-600 bg-amber-700/10'
-                } ${isGoldOrLegend ? 'legend-badge-glow' : ''}`}
+                }`}
               >
                 <span>{rank === 1 ? '👑' : rank === 2 ? '🥈' : '🥉'}</span>
                 <span>#{rank}</span>
@@ -275,18 +252,14 @@ function ChatMessageRow({
         onContextMenu={openContextMenu}
         className="message-appear flex gap-2 px-2 py-1 rounded-lg opacity-30"
       >
-        <span
-          onClick={() => onSelectMemberId?.(message.member_id)}
-          className="text-xs cursor-pointer hover:underline select-none font-semibold"
-          style={{ color }}
-        >
+        <span className="text-xs" style={{ color }}>
           {message.display_name}
         </span>
         <span className="text-xs text-muted-foreground line-through">
           {message.content || message.emoji}
         </span>
         <span className="text-[10px] text-muted-foreground ml-auto">[muted]</span>
-        {isMenuOpen && activeMenuPosition && typeof window !== 'undefined' && createPortal(
+        {isMenuOpen && activeMenuPosition && (
           <ModMenu
             position={activeMenuPosition}
             isOwn={isOwn}
@@ -301,8 +274,7 @@ function ChatMessageRow({
               setActiveMenu(null, null)
               onPinToggle(message)
             }}
-          />,
-          document.body
+          />
         )}
       </div>
     )
@@ -318,11 +290,7 @@ function ChatMessageRow({
         } ${message.status === 'failed' ? 'bg-destructive/10 border border-destructive/20' : ''}`}
       >
         <div className="flex items-center gap-2">
-          <span
-            onClick={() => onSelectMemberId?.(message.member_id)}
-            className={nameClassName}
-            style={nameStyle}
-          >
+          <span className={nameClassName} style={nameStyle}>
             {message.display_name}
           </span>
           {renderSenderBadges()}
@@ -368,7 +336,7 @@ function ChatMessageRow({
         <div className="text-lg py-0.5">{message.emoji}</div>
         {renderReactions()}
 
-        {isMenuOpen && activeMenuPosition && typeof window !== 'undefined' && createPortal(
+        {isMenuOpen && activeMenuPosition && (
           <ModMenu
             position={activeMenuPosition}
             isOwn={isOwn}
@@ -383,8 +351,7 @@ function ChatMessageRow({
               setActiveMenu(null, null)
               onPinToggle(message)
             }}
-          />,
-          document.body
+          />
         )}
       </div>
     )
@@ -398,11 +365,7 @@ function ChatMessageRow({
       } ${message.status === 'failed' ? 'bg-destructive/10 border border-destructive/20' : ''}`}
     >
       <div className="flex items-center gap-2">
-        <span
-          onClick={() => onSelectMemberId?.(message.member_id)}
-          className={nameClassName}
-          style={nameStyle}
-        >
+        <span className={nameClassName} style={nameStyle}>
           {message.display_name}
         </span>
         {renderSenderBadges()}
@@ -451,7 +414,7 @@ function ChatMessageRow({
 
       {renderReactions()}
 
-      {isMenuOpen && activeMenuPosition && typeof window !== 'undefined' && createPortal(
+      {isMenuOpen && activeMenuPosition && (
         <ModMenu
           position={activeMenuPosition}
           isOwn={isOwn}
@@ -466,8 +429,7 @@ function ChatMessageRow({
             setActiveMenu(null, null)
             onPinToggle(message)
           }}
-        />,
-        document.body
+        />
       )}
     </div>
   )
