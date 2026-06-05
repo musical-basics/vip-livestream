@@ -278,7 +278,7 @@ function ModMenu({
 }) {
   return (
     <div
-      className="mod-menu-container fixed z-50 glass rounded-xl shadow-xl p-1 min-w-[178px] border border-white/10"
+      className="mod-menu-container fixed z-50 bg-popover rounded-xl shadow-2xl p-1 min-w-[178px] border border-border"
       style={{ left: position.x, top: position.y }}
     >
       <p className="text-[10px] text-muted-foreground px-2 py-1 tracking-widest uppercase">
