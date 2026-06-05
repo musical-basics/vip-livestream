@@ -30,12 +30,15 @@ const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const ONLY = onlyArg
   ? new Set(onlyArg.slice("--only=".length).split(",").map((s) => s.trim().toLowerCase()))
   : null;
+// --test=<email>: send ONE sample email (dummy password) to <email>, no DB reads/writes.
+const testArg = process.argv.find((a) => a.startsWith("--test="));
+const TEST_TO = testArg ? testArg.slice("--test=".length).trim() : null;
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://vip.musicalbasics.com";
-const EMAIL_FROM = process.env.EMAIL_FROM || "Lionel Yu <vip@musicalbasics.com>";
+const EMAIL_FROM = process.env.EMAIL_FROM || "Lionel Yu <lionel@musicalbasics.com>";
 const REPLY_TO = process.env.EMAIL_REPLY_TO || "lionel@musicalbasics.com";
 
 // Concert details (for the email body).
@@ -140,6 +143,25 @@ async function sendEmail({ to, subject, html, text }) {
 }
 
 async function main() {
+  // --test mode: one sample email, no DB involvement.
+  if (TEST_TO) {
+    if (!RESEND_API_KEY) { console.error("❌ --test requires RESEND_API_KEY"); process.exit(1); }
+    const subject = `Your VIP access — ${CONCERT.name}`;
+    const { html, text } = renderEmail({ name: "Lionel", email: TEST_TO, password: "abcxyz" });
+    console.log(`TEST send → ${TEST_TO}`);
+    console.log(`From:        ${EMAIL_FROM}`);
+    console.log(`(sample only — password "abcxyz" is not real and nothing is written to the DB)\n`);
+    try {
+      const id = await sendEmail({ to: TEST_TO, subject, html, text });
+      console.log(`✓ sent (Resend id ${id}). Check your inbox.`);
+    } catch (e) {
+      console.log(`✗ FAILED — ${e.message}`);
+      console.log(`   If this mentions domain/verification, the From domain isn't verified in Resend yet.`);
+      process.exit(1);
+    }
+    return;
+  }
+
   const { data: all, error } = await supabase
     .from("members")
     .select("id,name,email,password_token,access_badges")
