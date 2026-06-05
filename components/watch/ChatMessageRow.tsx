@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState, useEffect } from 'react'
+import { memo, useState } from 'react'
 import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { canModerateChat, ROLE_BADGE } from '@/lib/roles'
@@ -23,7 +23,7 @@ interface ChatMessageRowProps {
   onDeleted: (messageId: string) => void
   onReacted: (messageId: string, reactions: Record<string, string[]>) => void
   onPinToggle: (message: ChatMessage) => void
-  activeMenuMessageId: string | null
+  isMenuOpen: boolean
   activeMenuPosition: { x: number; y: number } | null
   setActiveMenu: (messageId: string | null, position: { x: number; y: number } | null) => void
 }
@@ -59,7 +59,7 @@ function ChatMessageRow({
   onDeleted,
   onReacted,
   onPinToggle,
-  activeMenuMessageId,
+  isMenuOpen,
   activeMenuPosition,
   setActiveMenu,
 }: ChatMessageRowProps) {
@@ -214,7 +214,7 @@ function ChatMessageRow({
           {message.content || message.emoji}
         </span>
         <span className="text-[10px] text-muted-foreground ml-auto">[muted]</span>
-        {activeMenuMessageId === message.id && activeMenuPosition && (
+        {isMenuOpen && activeMenuPosition && (
           <ModMenu
             position={activeMenuPosition}
             isOwn={isOwn}
@@ -250,7 +250,7 @@ function ChatMessageRow({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              if (activeMenuMessageId === message.id) {
+              if (isMenuOpen) {
                 setActiveMenu(null, null)
               } else {
                 setActiveMenu(message.id, {
@@ -283,7 +283,7 @@ function ChatMessageRow({
         <div className="text-lg py-0.5">{message.emoji}</div>
         {renderReactions()}
 
-        {activeMenuMessageId === message.id && activeMenuPosition && (
+        {isMenuOpen && activeMenuPosition && (
           <ModMenu
             position={activeMenuPosition}
             isOwn={isOwn}
@@ -317,7 +317,7 @@ function ChatMessageRow({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (activeMenuMessageId === message.id) {
+            if (isMenuOpen) {
               setActiveMenu(null, null)
             } else {
               setActiveMenu(message.id, {
@@ -353,7 +353,7 @@ function ChatMessageRow({
 
       {renderReactions()}
 
-      {activeMenuMessageId === message.id && activeMenuPosition && (
+      {isMenuOpen && activeMenuPosition && (
         <ModMenu
           position={activeMenuPosition}
           isOwn={isOwn}
