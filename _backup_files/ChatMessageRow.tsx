@@ -1,9 +1,9 @@
 'use client'
 
-import { memo, useState, useEffect } from 'react'
+import { memo, useState } from 'react'
 import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
-import { canModerateChat, ROLE_BADGE } from '@/lib/roles'
+import { canModerateChat, nameColor, ROLE_BADGE } from '@/lib/roles'
 import { formatDistanceToNow } from 'date-fns'
 import { MoreHorizontal, Trash2, Clock, Smile, Pin } from 'lucide-react'
 import {
@@ -23,6 +23,10 @@ interface ChatMessageRowProps {
   onDeleted: (messageId: string) => void
   onReacted: (messageId: string, reactions: Record<string, string[]>) => void
   onPinToggle: (message: ChatMessage) => void
+  isMenuOpen: boolean
+  activeMenuPosition: { x: number; y: number } | null
+  setActiveMenu: (messageId: string | null, position: { x: number; y: number } | null) => void
+  timeTick?: number
 }
 
 const TIMEOUT_OPTIONS = [
@@ -30,20 +34,6 @@ const TIMEOUT_OPTIONS = [
   { label: '30 minutes', minutes: 30 },
   { label: 'Permanent', minutes: null },
 ]
-
-// Assign consistent colors to users
-function getMemberColor(memberId: string): string {
-  const colors = [
-    'oklch(0.75 0.12 85)',   // gold
-    'oklch(0.70 0.15 220)',  // blue
-    'oklch(0.72 0.14 160)',  // teal
-    'oklch(0.68 0.16 320)',  // pink
-    'oklch(0.73 0.13 270)',  // purple
-    'oklch(0.71 0.14 40)',   // orange
-  ]
-  const hash = memberId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  return colors[hash % colors.length]
-}
 
 function ChatMessageRow({
   message,
@@ -56,41 +46,28 @@ function ChatMessageRow({
   onDeleted,
   onReacted,
   onPinToggle,
+  isMenuOpen,
+  activeMenuPosition,
+  setActiveMenu,
+  timeTick,
 }: ChatMessageRowProps) {
-  const [modMenuPosition, setModMenuPosition] = useState<{ x: number; y: number } | null>(null)
   const [isActing, setIsActing] = useState(false)
-
-  useEffect(() => {
-    if (!modMenuPosition) return
-
-    function handleGlobalClose(e: Event) {
-      if ((e.target as Element).closest('.mod-menu-container')) {
-        return
-      }
-      setModMenuPosition(null)
-    }
-
-    const timer = setTimeout(() => {
-      window.addEventListener('pointerdown', handleGlobalClose)
-      window.addEventListener('contextmenu', handleGlobalClose)
-    }, 0)
-
-    return () => {
-      clearTimeout(timer)
-      window.removeEventListener('pointerdown', handleGlobalClose)
-      window.removeEventListener('contextmenu', handleGlobalClose)
-    }
-  }, [modMenuPosition])
 
   const isMod = canModerateChat(currentMember)
   const isOwn = message.member_id === currentMember.id
-  const color = getMemberColor(message.member_id)
+  const color = nameColor(senderRole, senderBadges)
   const visibleBadges = normalizeMemberBadges(senderBadges)
+
+  const displayDate = (() => {
+    const d = new Date(message.created_at)
+    const now = new Date()
+    return d > now ? now : d
+  })()
 
   function openContextMenu(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    setModMenuPosition({
+    setActiveMenu(message.id, {
       x: Math.min(e.clientX, window.innerWidth - 210),
       y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
     })
@@ -99,7 +76,7 @@ function ChatMessageRow({
   async function handleToggleReaction(emoji: string) {
     if (!streamId) return
     setIsActing(true)
-    setModMenuPosition(null)
+    setActiveMenu(null, null)
     try {
       const res = await fetch('/api/chat/react', {
         method: 'POST',
@@ -124,7 +101,7 @@ function ChatMessageRow({
   async function handleTimeout(minutes: number | null) {
     if (!streamId) return
     setIsActing(true)
-    setModMenuPosition(null)
+    setActiveMenu(null, null)
     try {
       await fetch('/api/mod/timeout', {
         method: 'POST',
@@ -143,7 +120,7 @@ function ChatMessageRow({
   async function handleMuteMessage() {
     if (!streamId) return
     setIsActing(true)
-    setModMenuPosition(null)
+    setActiveMenu(null, null)
     try {
       const res = await fetch('/api/mod/delete-message', {
         method: 'DELETE',
@@ -231,9 +208,9 @@ function ChatMessageRow({
           {message.content || message.emoji}
         </span>
         <span className="text-[10px] text-muted-foreground ml-auto">[muted]</span>
-        {modMenuPosition && (
+        {isMenuOpen && activeMenuPosition && (
           <ModMenu
-            position={modMenuPosition}
+            position={activeMenuPosition}
             isOwn={isOwn}
             isActing={isActing}
             currentMember={currentMember}
@@ -242,7 +219,10 @@ function ChatMessageRow({
             onReact={handleToggleReaction}
             onDelete={handleMuteMessage}
             onTimeout={handleTimeout}
-            onPinToggle={() => onPinToggle(message)}
+            onPinToggle={() => {
+              setActiveMenu(null, null)
+              onPinToggle(message)
+            }}
           />
         )}
       </div>
@@ -264,14 +244,14 @@ function ChatMessageRow({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              setModMenuPosition((position) =>
-                position
-                  ? null
-                  : {
-                      x: Math.min(e.clientX, window.innerWidth - 210),
-                      y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
-                    }
-              )
+              if (isMenuOpen) {
+                setActiveMenu(null, null)
+              } else {
+                setActiveMenu(message.id, {
+                  x: Math.min(e.clientX, window.innerWidth - 210),
+                  y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
+                })
+              }
             }}
             className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
             title={isMod ? "Moderator actions & reactions" : "React to message"}
@@ -285,7 +265,7 @@ function ChatMessageRow({
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default">
-                {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                {formatDistanceToNow(displayDate, { addSuffix: true })}
               </span>
             </TooltipTrigger>
             <TooltipContent>
@@ -297,9 +277,9 @@ function ChatMessageRow({
         <div className="text-lg py-0.5">{message.emoji}</div>
         {renderReactions()}
 
-        {modMenuPosition && (
+        {isMenuOpen && activeMenuPosition && (
           <ModMenu
-            position={modMenuPosition}
+            position={activeMenuPosition}
             isOwn={isOwn}
             isActing={isActing}
             currentMember={currentMember}
@@ -308,7 +288,10 @@ function ChatMessageRow({
             onReact={handleToggleReaction}
             onDelete={handleMuteMessage}
             onTimeout={handleTimeout}
-            onPinToggle={() => onPinToggle(message)}
+            onPinToggle={() => {
+              setActiveMenu(null, null)
+              onPinToggle(message)
+            }}
           />
         )}
       </div>
@@ -328,14 +311,14 @@ function ChatMessageRow({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            setModMenuPosition((position) =>
-              position
-                ? null
-                : {
-                    x: Math.min(e.clientX, window.innerWidth - 210),
-                    y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
-                  }
-            )
+            if (isMenuOpen) {
+              setActiveMenu(null, null)
+            } else {
+              setActiveMenu(message.id, {
+                x: Math.min(e.clientX, window.innerWidth - 210),
+                y: Math.min(e.clientY, window.innerHeight - (isMod ? 320 : 100)),
+              })
+            }
           }}
           className="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 transition-all"
           title={isMod ? "Moderator actions & reactions" : "React to message"}
@@ -349,7 +332,7 @@ function ChatMessageRow({
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default">
-              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+              {formatDistanceToNow(displayDate, { addSuffix: true })}
             </span>
           </TooltipTrigger>
           <TooltipContent>
@@ -364,9 +347,9 @@ function ChatMessageRow({
 
       {renderReactions()}
 
-      {modMenuPosition && (
+      {isMenuOpen && activeMenuPosition && (
         <ModMenu
-          position={modMenuPosition}
+          position={activeMenuPosition}
           isOwn={isOwn}
           isActing={isActing}
           currentMember={currentMember}
@@ -375,7 +358,10 @@ function ChatMessageRow({
           onReact={handleToggleReaction}
           onDelete={handleMuteMessage}
           onTimeout={handleTimeout}
-          onPinToggle={() => onPinToggle(message)}
+          onPinToggle={() => {
+            setActiveMenu(null, null)
+            onPinToggle(message)
+          }}
         />
       )}
     </div>

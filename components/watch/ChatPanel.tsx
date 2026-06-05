@@ -124,6 +124,7 @@ export default function ChatPanel({
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(null)
   const [activeMenuPosition, setActiveMenuPosition] = useState<{ x: number; y: number } | null>(null)
+  const [timeTick, setTimeTick] = useState(0)
   const handleActiveMenuChange = useCallback(
     (messageId: string | null, position: { x: number; y: number } | null) => {
       setActiveMenuMessageId(messageId)
@@ -139,6 +140,13 @@ export default function ChatPanel({
     }, 1000)
     return () => clearTimeout(timer)
   }, [cooldownRemaining])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeTick((prev) => prev + 1)
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!activeMenuMessageId) return
@@ -596,6 +604,7 @@ export default function ChatPanel({
                 isMenuOpen={activeMenuMessageId === msg.id}
                 activeMenuPosition={activeMenuMessageId === msg.id ? activeMenuPosition : null}
                 setActiveMenu={handleActiveMenuChange}
+                timeTick={timeTick}
               />
             )
           })()

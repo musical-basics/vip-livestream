@@ -7,19 +7,74 @@ import ChatMessageRow from './ChatMessageRow'
 import EmojiPicker from './EmojiPicker'
 import DisplayNameEditor from './DisplayNameEditor'
 import { Button } from '@/components/ui/button'
-import { Loader2, Send, Smile, ChevronUp, Users, Pin, X } from 'lucide-react'
+import { Loader2, Send, Smile, Users, Pin, X } from 'lucide-react'
 import EmojiOverlay from './EmojiOverlay'
 import { canModerateChat, roleLabel } from '@/lib/roles'
+import { DEFAULT_SLOW_MODE_DELAY_SECONDS } from '@/lib/chat-settings'
 
 const PAGE_SIZE = 50
 const MAX_MESSAGES_IN_MEMORY = 300
 const AUTO_SCROLL_THRESHOLD_PX = 96
+const LOAD_MORE_SCROLL_THRESHOLD_PX = 80
 const textareaAutoSizeStyle: CSSProperties & { fieldSizing?: string } = { fieldSizing: 'content' }
 
 function appendMessage(messages: ChatMessage[], message: ChatMessage) {
   if (messages.find((existing) => existing.id === message.id)) return messages
   const next = [...messages, message]
   return next.length > MAX_MESSAGES_IN_MEMORY ? next.slice(-MAX_MESSAGES_IN_MEMORY) : next
+}
+
+const EMOTICON_MAP: Record<string, string> = {
+  '<3': '❤️',
+  ':lol:': '😂',
+  ':fire:': '🔥',
+  ':clap:': '👏',
+  ':applause:': '👏',
+  ':piano:': '🎹',
+  ':star:': '⭐',
+  ':heart:': '❤️',
+  ':O': '😮',
+  ':o': '😮',
+  ':-O': '😮',
+  ':D': '😀',
+  ':-D': '😃',
+  ':)': '🙂',
+  ':-)': '🙂',
+  ';)': '😉',
+  ';-)': '😉',
+  ':(': '🙁',
+  ':-(': '🙁',
+  ':/': '😕',
+  ':\\': '😕',
+  ':P': '😛',
+  ':p': '😛',
+  'xD': '😆',
+  'XD': '😆',
+  'B)': '😎',
+  'B-)': '😎',
+}
+
+function replaceEmoticons(text: string): string {
+  if (!text) return text
+  return text
+    .split(/(\s+)/)
+    .map((token) => {
+      if (/^\s+$/.test(token)) return token
+
+      if (EMOTICON_MAP[token]) {
+        return EMOTICON_MAP[token]
+      }
+
+      const lastChar = token.slice(-1)
+      if (['.', ',', '!', '?'].includes(lastChar)) {
+        const stem = token.slice(0, -1)
+        if (EMOTICON_MAP[stem]) {
+          return EMOTICON_MAP[stem] + lastChar
+        }
+      }
+      return token
+    })
+    .join('')
 }
 
 interface ChatPanelProps {
@@ -30,6 +85,7 @@ interface ChatPanelProps {
   isMuted: boolean
   onEmojiReaction: (emoji: string) => void
   onTipBanner: (tip: { name: string; amount: number; message?: string }) => void
+  highlightNameEditor?: boolean
 }
 
 export default function ChatPanel({
@@ -40,9 +96,16 @@ export default function ChatPanel({
   isMuted: initialMuted,
   onEmojiReaction,
   onTipBanner,
+  highlightNameEditor = false,
 }: ChatPanelProps) {
+  const streamId = stream?.id
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(() => {
+    if (typeof window !== 'undefined' && streamId) {
+      return localStorage.getItem(`draft_chat_${streamId}`) || ''
+    }
+    return ''
+  })
   const [isSending, setIsSending] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [applauseCooldown, setApplauseCooldown] = useState(false)
@@ -56,17 +119,19 @@ export default function ChatPanel({
   const [pinnedMessage, setPinnedMessage] = useState<ChatMessage | null>(
     () => (stream?.pinned_message as unknown as ChatMessage) || null
   )
-  const [slowModeDelay, setSlowModeDelay] = useState(stream?.slow_mode_delay || 0)
+  const [slowModeDelay, setSlowModeDelay] = useState(stream?.slow_mode_delay ?? DEFAULT_SLOW_MODE_DELAY_SECONDS)
   const [isUpdatingSlowMode, setIsUpdatingSlowMode] = useState(false)
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
-
-  useEffect(() => {
-    setPinnedMessage((stream?.pinned_message as unknown as ChatMessage) || null)
-  }, [stream?.pinned_message])
-
-  useEffect(() => {
-    setSlowModeDelay(stream?.slow_mode_delay || 0)
-  }, [stream?.slow_mode_delay])
+  const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(null)
+  const [activeMenuPosition, setActiveMenuPosition] = useState<{ x: number; y: number } | null>(null)
+  const [timeTick, setTimeTick] = useState(0)
+  const handleActiveMenuChange = useCallback(
+    (messageId: string | null, position: { x: number; y: number } | null) => {
+      setActiveMenuMessageId(messageId)
+      setActiveMenuPosition(position)
+    },
+    []
+  )
 
   useEffect(() => {
     if (cooldownRemaining <= 0) return
@@ -75,6 +140,33 @@ export default function ChatPanel({
     }, 1000)
     return () => clearTimeout(timer)
   }, [cooldownRemaining])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeTick((prev) => prev + 1)
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (!activeMenuMessageId) return
+
+    function handleGlobalClose(e: Event) {
+      if ((e.target as Element).closest('.mod-menu-container')) {
+        return
+      }
+      setActiveMenuMessageId(null)
+      setActiveMenuPosition(null)
+    }
+
+    window.addEventListener('pointerdown', handleGlobalClose, true)
+    window.addEventListener('contextmenu', handleGlobalClose, true)
+
+    return () => {
+      window.removeEventListener('pointerdown', handleGlobalClose, true)
+      window.removeEventListener('contextmenu', handleGlobalClose, true)
+    }
+  }, [activeMenuMessageId])
 
   const spawnEmojiBurst = useCallback((emoji: string, count = 6) => {
     setChatFloatingEmojis((prev) => {
@@ -132,19 +224,63 @@ export default function ChatPanel({
     }
   }, [])
 
+  // Load older messages (scroll up pagination)
+  const loadMore = useCallback(async () => {
+    if (!streamId || isLoadingMore || !hasMore) return
+    const oldestMsg = messages[0]
+    if (!oldestMsg) return
+
+    shouldAutoScrollRef.current = false
+    setIsLoadingMore(true)
+    try {
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('stream_id', streamId)
+        .eq('is_muted', false)
+        .lt('created_at', oldestMsg.created_at)
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE)
+
+      if (data && data.length > 0) {
+        setMessages((prev) => {
+          const next = [...data.reverse(), ...prev]
+          return next.length > MAX_MESSAGES_IN_MEMORY ? next.slice(0, MAX_MESSAGES_IN_MEMORY) : next
+        })
+        setHasMore(data.length >= PAGE_SIZE)
+        // Restore scroll position (don't jump to bottom)
+        const container = scrollRef.current
+        if (container) {
+          const prevHeight = container.scrollHeight
+          setTimeout(() => {
+            container.scrollTop = container.scrollHeight - prevHeight
+          }, 0)
+        }
+      } else {
+        setHasMore(false)
+      }
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [hasMore, isLoadingMore, messages, streamId, supabase])
+
   const handleScroll = useCallback(() => {
     const container = scrollRef.current
     if (!container) return
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
     shouldAutoScrollRef.current = distanceFromBottom < AUTO_SCROLL_THRESHOLD_PX
-  }, [])
+
+    if (container.scrollTop <= LOAD_MORE_SCROLL_THRESHOLD_PX) {
+      void loadMore()
+    }
+  }, [loadMore])
 
   // Realtime subscriptions
   useEffect(() => {
-    if (!stream?.id) return
+    if (!streamId) return
 
     const channel = supabase
-      .channel(`stream:${stream.id}`)
+      .channel(`stream:${streamId}`)
       .on('broadcast', { event: 'new_message' }, ({ payload }) => {
         const msg = payload as ChatMessage
         setMessages((prev) => appendMessage(prev, msg))
@@ -222,64 +358,27 @@ export default function ChatPanel({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [stream?.id, member.id, displayName, onTipBanner, supabase, spawnEmojiBurst, onEmojiReaction])
-
-  // Load older messages (scroll up pagination)
-  async function loadMore() {
-    if (!stream?.id || isLoadingMore || !hasMore) return
-    const oldestMsg = messages[0]
-    if (!oldestMsg) return
-
-    shouldAutoScrollRef.current = false
-    setIsLoadingMore(true)
-    try {
-      const { data } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('stream_id', stream.id)
-        .eq('is_muted', false)
-        .lt('created_at', oldestMsg.created_at)
-        .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE)
-
-      if (data && data.length > 0) {
-        setMessages((prev) => {
-          const next = [...data.reverse(), ...prev]
-          return next.length > MAX_MESSAGES_IN_MEMORY ? next.slice(0, MAX_MESSAGES_IN_MEMORY) : next
-        })
-        setHasMore(data.length >= PAGE_SIZE)
-        // Restore scroll position (don't jump to bottom)
-        const container = scrollRef.current
-        if (container) {
-          const prevHeight = container.scrollHeight
-          setTimeout(() => {
-            container.scrollTop = container.scrollHeight - prevHeight
-          }, 0)
-        }
-      } else {
-        setHasMore(false)
-      }
-    } finally {
-      setIsLoadingMore(false)
-    }
-  }
+  }, [streamId, member.id, displayName, onTipBanner, supabase, spawnEmojiBurst, onEmojiReaction])
 
   const sendMessage = useCallback(async (content?: string, emoji?: string) => {
-    if (!stream?.id) return
+    if (!streamId) return
     if (isMuted) return
     if (isSending) return
-    const msgContent = content ?? input.trim()
+    const msgContent = replaceEmoticons(content ?? input.trim())
     if (!msgContent && !emoji) return
 
     setIsSending(true)
     setInput('')
+    if (streamId) {
+      localStorage.removeItem(`draft_chat_${streamId}`)
+    }
 
     try {
       const res = await fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          stream_id: stream.id,
+          stream_id: streamId,
           content: emoji ? null : msgContent,
           emoji: emoji || null,
           display_name: displayName,
@@ -302,17 +401,17 @@ export default function ChatPanel({
     } finally {
       setIsSending(false)
     }
-  }, [displayName, input, isMuted, isSending, stream?.id, slowModeDelay, member])
+  }, [displayName, input, isMuted, isSending, streamId, slowModeDelay, member])
 
   const updateSlowMode = useCallback(async (delay: number) => {
-    if (!stream?.id || isUpdatingSlowMode) return
+    if (!streamId || isUpdatingSlowMode) return
     setIsUpdatingSlowMode(true)
     try {
       const res = await fetch('/api/mod/slow-mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          stream_id: stream.id,
+          stream_id: streamId,
           slow_mode_delay: delay,
         }),
       })
@@ -324,7 +423,7 @@ export default function ChatPanel({
     } finally {
       setIsUpdatingSlowMode(false)
     }
-  }, [stream?.id, isUpdatingSlowMode])
+  }, [streamId, isUpdatingSlowMode])
 
   function handleEmojiSelect(emoji: string) {
     setShowEmojiPicker(false)
@@ -334,7 +433,7 @@ export default function ChatPanel({
   }
 
   const handleApplauseClick = useCallback(() => {
-    if (!stream?.id || applauseCooldown) return
+    if (!streamId || applauseCooldown) return
     setApplauseCooldown(true)
 
     onEmojiReaction('👏')
@@ -344,7 +443,7 @@ export default function ChatPanel({
     setTimeout(() => {
       setApplauseCooldown(false)
     }, 1000)
-  }, [stream?.id, applauseCooldown, onEmojiReaction, sendMessage, spawnEmojiBurst])
+  }, [streamId, applauseCooldown, onEmojiReaction, sendMessage, spawnEmojiBurst])
 
   const handleMessageDeleted = useCallback((messageId: string) => {
     setMessages((prev) => prev.filter((message) => message.id !== messageId))
@@ -370,7 +469,7 @@ export default function ChatPanel({
   }, [spawnEmojiBurst])
 
   const handlePinToggle = useCallback(async (msg: ChatMessage) => {
-    if (!stream?.id) return
+    if (!streamId) return
     const isCurrentlyPinned = pinnedMessage?.id === msg.id
     const targetMessageId = isCurrentlyPinned ? null : msg.id
 
@@ -383,7 +482,7 @@ export default function ChatPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message_id: targetMessageId,
-          stream_id: stream.id,
+          stream_id: streamId,
         }),
       })
       if (!res.ok) {
@@ -392,13 +491,16 @@ export default function ChatPanel({
     } catch {
       setPinnedMessage(pinnedMessage)
     }
-  }, [stream?.id, pinnedMessage])
+  }, [streamId, pinnedMessage])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      if (cooldownRemaining > 0 && !canModerateChat(member)) return
-      sendMessage()
+    if (e.key === 'Enter') {
+      const isMobile = typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent)
+      if (isMobile || !e.shiftKey) {
+        e.preventDefault()
+        if (cooldownRemaining > 0 && !canModerateChat(member)) return
+        sendMessage()
+      }
     }
   }
 
@@ -410,6 +512,7 @@ export default function ChatPanel({
           member={member}
           displayName={displayName}
           onChange={setDisplayName}
+          highlight={highlightNameEditor}
         />
         <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
           {canModerateChat(member) && (
@@ -468,20 +571,11 @@ export default function ChatPanel({
         onScroll={handleScroll}
         className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-3 space-y-1"
       >
-        {/* Load more button */}
-        {hasMore && (
-          <button
-            onClick={loadMore}
-            disabled={isLoadingMore}
-            className="w-full flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {isLoadingMore ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <ChevronUp className="w-3 h-3" />
-            )}
-            {isLoadingMore ? 'Loading…' : 'Load earlier messages'}
-          </button>
+        {isLoadingMore && (
+          <div className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Loading earlier messages
+          </div>
         )}
 
         {messages.length === 0 && (
@@ -502,11 +596,15 @@ export default function ChatPanel({
                 senderBadges={sender?.access_badges}
                 senderRole={roleLabel(sender)}
                 isMuted={mutedMessageIds.has(msg.id)}
-                streamId={stream?.id}
+                streamId={streamId}
                 onDeleted={handleMessageDeleted}
                 isPinned={pinnedMessage?.id === msg.id}
                 onPinToggle={handlePinToggle}
                 onReacted={handleMessageReacted}
+                isMenuOpen={activeMenuMessageId === msg.id}
+                activeMenuPosition={activeMenuMessageId === msg.id ? activeMenuPosition : null}
+                setActiveMenu={handleActiveMenuChange}
+                timeTick={timeTick}
               />
             )
           })()
@@ -544,10 +642,38 @@ export default function ChatPanel({
             <div className="flex items-end gap-2">
               <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value
+                  const isMobile = typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent)
+
+                  if (isMobile && val.includes('\n')) {
+                    const cleaned = val.replace(/\n/g, '')
+                    if (cooldownRemaining > 0 && !canModerateChat(member)) {
+                      setInput(cleaned)
+                      if (streamId) {
+                        localStorage.setItem(`draft_chat_${streamId}`, cleaned)
+                      }
+                      return
+                    }
+                    if (cleaned.trim()) {
+                      sendMessage(cleaned)
+                    } else {
+                      setInput('')
+                      if (streamId) {
+                        localStorage.removeItem(`draft_chat_${streamId}`)
+                      }
+                    }
+                    return
+                  }
+
+                  setInput(val)
+                  if (streamId) {
+                    localStorage.setItem(`draft_chat_${streamId}`, val)
+                  }
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder="Say something…"
-                disabled={!stream?.id}
+                disabled={!streamId}
                 rows={1}
                 maxLength={500}
                 className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/8 bg-white/5 px-3 py-2.5 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm max-h-[100px] overflow-y-auto"
@@ -555,7 +681,7 @@ export default function ChatPanel({
               />
               <button
                 onClick={handleApplauseClick}
-                disabled={!stream?.id || applauseCooldown || (cooldownRemaining > 0 && !canModerateChat(member))}
+                disabled={!streamId || applauseCooldown || (cooldownRemaining > 0 && !canModerateChat(member))}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-amber-400 hover:text-amber-300 transition-all hover:scale-105 active:scale-95 duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Applause reaction (👏)"
               >
@@ -563,7 +689,7 @@ export default function ChatPanel({
               </button>
               <button
                 onClick={() => setShowEmojiPicker((v) => !v)}
-                disabled={!stream?.id}
+                disabled={!streamId}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
                 title="Emoji reactions"
               >
@@ -571,7 +697,7 @@ export default function ChatPanel({
               </button>
               <Button
                 onClick={() => sendMessage()}
-                disabled={isSending || !input.trim() || !stream?.id || (cooldownRemaining > 0 && !canModerateChat(member))}
+                disabled={isSending || !input.trim() || !streamId || (cooldownRemaining > 0 && !canModerateChat(member))}
                 size="sm"
                 className="h-11 shrink-0 rounded-xl px-3"
                 style={{

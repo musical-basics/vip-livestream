@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Member, Stream, Comment } from '@/lib/database.types'
 import { Button } from '@/components/ui/button'
 import { Loader2, MessageCircle, Send } from 'lucide-react'
@@ -14,7 +14,20 @@ interface CommentSectionProps {
 
 export default function CommentSection({ member, stream, initialComments }: CommentSectionProps) {
   const [comments, setComments] = useState<Comment[]>(initialComments)
-  const [content, setContent] = useState('')
+  const [timeTick, setTimeTick] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeTick((prev) => prev + 1)
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [])
+  const [content, setContent] = useState(() => {
+    if (typeof window !== 'undefined' && stream?.id) {
+      return localStorage.getItem(`draft_comment_${stream.id}`) || ''
+    }
+    return ''
+  })
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -40,6 +53,9 @@ export default function CommentSection({ member, stream, initialComments }: Comm
       const { comment } = await res.json()
       setComments((prev) => [...prev, comment])
       setContent('')
+      if (stream?.id) {
+        localStorage.removeItem(`draft_comment_${stream.id}`)
+      }
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch {
@@ -70,7 +86,13 @@ export default function CommentSection({ member, stream, initialComments }: Comm
           <form onSubmit={handleSubmit} className="space-y-3">
             <textarea
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value
+                setContent(val)
+                if (stream?.id) {
+                  localStorage.setItem(`draft_comment_${stream.id}`, val)
+                }
+              }}
               placeholder="Share your thoughts, feelings, or a message for the performer…"
               rows={4}
               maxLength={1000}
@@ -113,20 +135,27 @@ export default function CommentSection({ member, stream, initialComments }: Comm
             <MessageCircle className="w-3.5 h-3.5" />
             {comments.length} note{comments.length !== 1 ? 's' : ''}
           </h4>
-          {[...comments].reverse().map((comment) => (
-            <div key={comment.id} className="glass rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[oklch(0.75_0.12_85)] to-[oklch(0.55_0.10_70)] flex items-center justify-center text-[10px] font-bold text-[oklch(0.09_0.015_270)]">
-                  {comment.display_name[0]?.toUpperCase()}
+          {[...comments].reverse().map((comment) => {
+            const displayDate = (() => {
+              const d = new Date(comment.created_at)
+              const now = new Date()
+              return d > now ? now : d
+            })()
+            return (
+              <div key={comment.id} className="glass rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[oklch(0.75_0.12_85)] to-[oklch(0.55_0.10_70)] flex items-center justify-center text-[10px] font-bold text-[oklch(0.09_0.015_270)]">
+                    {comment.display_name[0]?.toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium">{comment.display_name}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {formatDistanceToNow(displayDate, { addSuffix: true })}
+                  </span>
                 </div>
-                <span className="text-sm font-medium">{comment.display_name}</span>
-                <span className="text-xs text-muted-foreground ml-auto">
-                  {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                </span>
+                <p className="text-sm text-foreground/80 leading-relaxed">{comment.content}</p>
               </div>
-              <p className="text-sm text-foreground/80 leading-relaxed">{comment.content}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

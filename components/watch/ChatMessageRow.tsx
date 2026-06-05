@@ -26,6 +26,7 @@ interface ChatMessageRowProps {
   isMenuOpen: boolean
   activeMenuPosition: { x: number; y: number } | null
   setActiveMenu: (messageId: string | null, position: { x: number; y: number } | null) => void
+  timeTick?: number
 }
 
 const TIMEOUT_OPTIONS = [
@@ -48,6 +49,7 @@ function ChatMessageRow({
   isMenuOpen,
   activeMenuPosition,
   setActiveMenu,
+  timeTick,
 }: ChatMessageRowProps) {
   const [isActing, setIsActing] = useState(false)
 
@@ -55,6 +57,12 @@ function ChatMessageRow({
   const isOwn = message.member_id === currentMember.id
   const color = nameColor(senderRole, senderBadges)
   const visibleBadges = normalizeMemberBadges(senderBadges)
+
+  const displayDate = (() => {
+    const d = new Date(message.created_at)
+    const now = new Date()
+    return d > now ? now : d
+  })()
 
   function openContextMenu(e: React.MouseEvent) {
     e.preventDefault()
@@ -257,7 +265,7 @@ function ChatMessageRow({
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default">
-                {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                {formatDistanceToNow(displayDate, { addSuffix: true })}
               </span>
             </TooltipTrigger>
             <TooltipContent>
@@ -324,7 +332,7 @@ function ChatMessageRow({
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="text-[10px] text-muted-foreground/50 ml-auto cursor-default">
-              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+              {formatDistanceToNow(displayDate, { addSuffix: true })}
             </span>
           </TooltipTrigger>
           <TooltipContent>
