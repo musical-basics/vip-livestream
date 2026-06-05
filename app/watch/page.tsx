@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
+import { getVerifiedLiveStream } from '@/lib/live-stream'
 import { createServiceClient } from '@/lib/supabase-server'
 import WatchPageClient from '@/components/watch/WatchPageClient'
 import type { ChatMessage, Comment, Member, Stream } from '@/lib/database.types'
@@ -10,16 +11,8 @@ export default async function WatchPage() {
 
   const supabase = createServiceClient()
 
-  // Only an active live stream belongs on /watch. Ended YouTube links live in /recordings.
-  const { data: liveStream } = await supabase
-    .from('streams')
-    .select('*')
-    .eq('is_live', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const stream: Stream | null = liveStream ?? null
+  // Only a YouTube-confirmed active live stream belongs on /watch.
+  const stream: Stream | null = await getVerifiedLiveStream(supabase)
 
   // Fetch all stream-dependent data in parallel once we have a stream
   const [messagesRes, commentsRes, timeoutRes, membersRes] = stream

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { getVerifiedLiveStream } from '@/lib/live-stream'
 import { createServiceClient } from '@/lib/supabase-server'
 
 export async function GET() {
@@ -10,16 +11,9 @@ export async function GET() {
 
   const supabase = createServiceClient()
 
-  // Get the active stream
-  const { data: stream, error } = await supabase
-    .from('streams')
-    .select('id, stream_start_utc, is_live, youtube_video_id')
-    .eq('is_live', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
+  const stream = await getVerifiedLiveStream(supabase)
 
-  if (error || !stream) {
+  if (!stream) {
     return NextResponse.json({ is_live: false })
   }
 
