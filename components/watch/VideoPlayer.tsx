@@ -9,48 +9,71 @@ interface VideoPlayerProps {
   fill?: boolean
 }
 
+type PlayerStatus = 'loading' | 'ready' | 'offline'
+
+interface YouTubePlayer {
+  destroy?: () => void
+  getPlayerState?: () => number
+  pauseVideo?: () => void
+  playVideo?: () => void
+}
+
+interface YouTubePlayerEvent {
+  data: number
+  target: YouTubePlayer
+}
+
+interface YouTubePlayerOptions {
+  width: string
+  height: string
+  videoId: string
+  playerVars: Record<string, number | string>
+  events: {
+    onReady: (event: YouTubePlayerEvent) => void
+    onStateChange: (event: YouTubePlayerEvent) => void
+    onError: () => void
+  }
+}
+
 declare global {
   interface Window {
-    YT: any
-    onYouTubeIframeAPIReady: () => void
+    YT?: {
+      Player?: new (element: HTMLElement, options: YouTubePlayerOptions) => YouTubePlayer
+      PlayerState?: {
+        BUFFERING: number
+        PLAYING: number
+      }
+    }
+    onYouTubeIframeAPIReady?: () => void
   }
 }
 
 export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) {
-  const playerRef = useRef<any>(null)
+  const videoId = stream?.youtube_video_id
+  const playerRef = useRef<YouTubePlayer | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const [playerState, setPlayerState] = useState<'loading' | 'ready' | 'offline'>('loading')
-  const [isPlaying, setIsPlaying] = useState(false)
-  const hasLiveVideo = !!stream?.is_live && !!stream.youtube_video_id
-
-  const syncPlayer = useCallback(async () => {
-    if (!playerRef.current || !stream?.is_live) return
-    try {
-      const res = await fetch('/api/stream/sync')
-      if (!res.ok) return
-      const data = await res.json()
-      if (!data.is_live || data.offset_seconds === undefined) return
-
-      const currentTime = playerRef.current.getCurrentTime?.() || 0
-      const drift = Math.abs(currentTime - data.offset_seconds)
-
-      // Only resync if drift > 5 seconds to avoid constant seeking
-      if (drift > 5) {
-        playerRef.current.seekTo(data.offset_seconds, true)
-      }
-    } catch (err) {
-      console.error('Sync error:', err)
-    }
-  }, [stream])
+  const playerElementRef = useRef<HTMLDivElement>(null)
+  const [playback, setPlayback] = useState<{
+    isPlaying: boolean
+    playerState: PlayerStatus
+    videoId: string | null
+  }>({ isPlaying: false, playerState: 'loading', videoId: null })
+  const hasLiveVideo = !!stream?.is_live && !!videoId
+  const playerState = playback.videoId === videoId ? playback.playerState : 'loading'
+  const isPlaying = playback.videoId === videoId ? playback.isPlaying : false
 
   const initPlayer = useCallback(() => {
-    if (!window.YT || !stream?.youtube_video_id) return
+    if (!window.YT?.Player || !playerElementRef.current || !videoId) return
 
-    playerRef.current = new window.YT.Player('yt-player', {
+    if (playerRef.current?.destroy) {
+      playerRef.current.destroy()
+      playerRef.current = null
+    }
+
+    playerRef.current = new window.YT.Player(playerElementRef.current, {
       width: '100%',
       height: '100%',
-      videoId: stream.youtube_video_id,
+      videoId,
       playerVars: {
         autoplay: 1,
         controls: 1,
@@ -60,35 +83,29 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
         color: 'white',
       },
       events: {
-        onReady: async (event: any) => {
-          setPlayerState('ready')
-          // Initial sync
+        onReady: (event) => {
           try {
-            const res = await fetch('/api/stream/sync')
-            if (res.ok) {
-              const data = await res.json()
-              if (data.is_live && data.offset_seconds > 0) {
-                event.target.seekTo(data.offset_seconds, true)
-                event.target.playVideo()
-                setIsPlaying(true)
-              }
-            }
-          } catch {}
-
-          // Start sync heartbeat every 30s
-          syncIntervalRef.current = setInterval(syncPlayer, 30000)
+            event.target.playVideo?.()
+            setPlayback({ isPlaying: true, playerState: 'ready', videoId })
+          } catch (err) {
+            console.error('YouTube play error:', err)
+            setPlayback({ isPlaying: false, playerState: 'ready', videoId })
+          }
         },
-        onStateChange: (event: any) => {
+        onStateChange: (event) => {
           const playerStates = window.YT?.PlayerState
-          setIsPlaying(event.data === playerStates?.PLAYING || event.data === 1)
+          setPlayback((current) => ({
+            isPlaying: event.data === playerStates?.PLAYING || event.data === 1,
+            playerState: current.videoId === videoId ? current.playerState : 'ready',
+            videoId,
+          }))
         },
         onError: () => {
-          setPlayerState('offline')
-          setIsPlaying(false)
+          setPlayback({ isPlaying: false, playerState: 'offline', videoId })
         },
       },
     })
-  }, [stream, syncPlayer])
+  }, [videoId])
 
   const togglePlayback = useCallback(() => {
     if (!playerRef.current || playerState !== 'ready') return
@@ -103,24 +120,28 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
       isPlaying
 
     if (playerIsPlaying) {
-      playerRef.current.pauseVideo?.()
-      setIsPlaying(false)
+      try {
+        playerRef.current.pauseVideo?.()
+      } catch (err) {
+        console.error('YouTube pause error:', err)
+      }
+      setPlayback((current) => ({ ...current, isPlaying: false }))
       return
     }
 
-    playerRef.current.playVideo?.()
-    setIsPlaying(true)
+    try {
+      playerRef.current.playVideo?.()
+      setPlayback((current) => ({ ...current, isPlaying: true }))
+    } catch (err) {
+      console.error('YouTube play error:', err)
+      setPlayback((current) => ({ ...current, isPlaying: false }))
+    }
   }, [isPlaying, playerState])
 
   useEffect(() => {
     if (!hasLiveVideo) {
-      setPlayerState('loading')
-      setIsPlaying(false)
       return
     }
-
-    setPlayerState('loading')
-    setIsPlaying(false)
 
     // Load YouTube IFrame API
     if (window.YT?.Player) {
@@ -137,8 +158,10 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
     }
 
     return () => {
-      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current)
-      if (playerRef.current?.destroy) playerRef.current.destroy()
+      if (playerRef.current?.destroy) {
+        playerRef.current.destroy()
+        playerRef.current = null
+      }
     }
   }, [hasLiveVideo, initPlayer, stream?.youtube_video_id])
 
@@ -151,7 +174,7 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
             The performance will begin shortly
           </p>
           <p className="text-xs text-muted-foreground/50 mt-1">
-            Please stay connected — we'll start when the artist is ready
+            Please stay connected — we will start when the artist is ready
           </p>
         </div>
       </div>
@@ -180,7 +203,7 @@ export default function VideoPlayer({ stream, fill = false }: VideoPlayerProps) 
       )}
 
       {/* YouTube embed container */}
-      <div id="yt-player" className="w-full h-full" />
+      <div ref={playerElementRef} className="w-full h-full" />
 
       {playerState === 'ready' && (
         <button
