@@ -111,6 +111,45 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to send' }, { status: 500 })
   }
 
+  // Check user milestones
+  try {
+    const { count: userMessageCount } = await supabase
+      .from('chat_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('stream_id', stream_id)
+      .eq('member_id', member.id)
+      .eq('is_muted', false)
+      .not('content', 'like', '[System]%')
+
+    const MILESTONES = [10, 25, 50, 100, 250, 500]
+    if (userMessageCount && MILESTONES.includes(userMessageCount)) {
+      const milestoneMessageContent = `[System] 🎉 ${displayName} has reached ${userMessageCount} messages this show! 🎹`
+      const { data: systemMsg } = await supabase
+        .from('chat_messages')
+        .insert({
+          stream_id,
+          member_id: member.id,
+          display_name: 'System',
+          content: milestoneMessageContent,
+          emoji: null,
+          is_muted: false,
+        })
+        .select()
+        .single()
+
+      if (systemMsg) {
+        const systemChannel = supabase.channel(`stream:${stream_id}`)
+        await systemChannel.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: systemMsg,
+        })
+      }
+    }
+  } catch (err) {
+    console.error('Milestone check failed:', err)
+  }
+
   // Broadcast via Supabase Realtime (re-using service client connection)
   const channel = supabase.channel(`stream:${stream_id}`)
   await channel.send({

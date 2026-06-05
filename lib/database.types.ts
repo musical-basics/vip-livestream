@@ -288,23 +288,10 @@ export interface Database {
     }
     Views: Record<string, never>
     Functions: {
-      get_top_chatters: {
+      get_scoped_top_chatters: {
         Args: {
-          p_stream_id: string
-          p_limit?: number
-        }
-        Returns: {
-          member_id: string
-          display_name: string
-          name: string
-          name_color: string | null
-          access_badges: string[]
-          is_moderator: boolean
-          message_count: number
-        }[]
-      }
-      get_all_time_top_chatters: {
-        Args: {
+          p_scope: string
+          p_stream_id?: string | null
           p_limit?: number
         }
         Returns: {

@@ -218,6 +218,8 @@ export default function WatchPageClient({
 
   const handleRealtimeMessage = useCallback((msg: ChatMessage) => {
     if (!msg.member_id) return
+    // Exclude automated system milestone events from the chatter leaderboard
+    if (msg.content?.startsWith('[System]')) return
 
     setLeaderboard((prev) => {
       const sender = memberDirectory.find(m => m.id === msg.member_id)
@@ -258,6 +260,14 @@ export default function WatchPageClient({
       ranks.set(chatter.member_id, index + 1)
     })
     return ranks
+  }, [leaderboard])
+
+  const topChatterMessagesCount = useMemo(() => {
+    const counts = new Map<string, number>()
+    leaderboard.forEach((chatter) => {
+      counts.set(chatter.member_id, Number(chatter.message_count))
+    })
+    return counts
   }, [leaderboard])
 
   // Resize state (desktop only)
@@ -601,6 +611,7 @@ export default function WatchPageClient({
       onTipBanner={setTipBanner}
       highlightNameEditor={showConcertAnnouncement}
       topChatterRanks={topChatterRanks}
+      chatterMessagesCountMap={topChatterMessagesCount}
     />
   )
 

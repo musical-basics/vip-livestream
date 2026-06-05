@@ -26,6 +26,8 @@ interface LeaderboardPanelProps {
   onRefresh: () => void
 }
 
+type ScopeType = 'current' | 'weekly' | 'monthly' | 'all-time'
+
 export default function LeaderboardPanel({
   stream,
   memberDirectory,
@@ -35,48 +37,87 @@ export default function LeaderboardPanel({
   error,
   onRefresh,
 }: LeaderboardPanelProps) {
-  const [scope, setScope] = useState<'current' | 'all-time'>('current')
-  const [allTimeChatters, setAllTimeChatters] = useState<Chatter[]>([])
-  const [allTimeLoading, setAllTimeLoading] = useState(false)
-  const [allTimeRefreshing, setAllTimeRefreshing] = useState(false)
-  const [allTimeError, setAllTimeError] = useState<string | null>(null)
+  const [scope, setScope] = useState<ScopeType>('current')
+  
+  const [localLeaderboards, setLocalLeaderboards] = useState<Record<string, {
+    chatters: Chatter[]
+    loading: boolean
+    refreshing: boolean
+    error: string | null
+  }>>({
+    'weekly': { chatters: [], loading: false, refreshing: false, error: null },
+    'monthly': { chatters: [], loading: false, refreshing: false, error: null },
+    'all-time': { chatters: [], loading: false, refreshing: false, error: null },
+  })
 
-  async function fetchAllTimeLeaderboard(refresh = false) {
-    if (refresh) {
-      setAllTimeRefreshing(true)
-    } else {
-      setAllTimeLoading(true)
-    }
+  async function fetchLocalLeaderboard(targetScope: 'weekly' | 'monthly' | 'all-time', refresh = false) {
+    setLocalLeaderboards(prev => ({
+      ...prev,
+      [targetScope]: {
+        ...prev[targetScope],
+        loading: !refresh,
+        refreshing: refresh,
+      }
+    }))
 
     try {
-      const res = await fetch('/api/chat/leaderboard?scope=all-time')
-      if (!res.ok) throw new Error('Failed to fetch all-time leaderboard')
+      const res = await fetch(`/api/chat/leaderboard?scope=${targetScope}`)
+      if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
+      
       startTransition(() => {
-        setAllTimeChatters(data.leaderboard || [])
-        setAllTimeError(null)
+        setLocalLeaderboards(prev => ({
+          ...prev,
+          [targetScope]: {
+            chatters: data.leaderboard || [],
+            loading: false,
+            refreshing: false,
+            error: null,
+          }
+        }))
       })
     } catch (err) {
       console.error(err)
-      setAllTimeError('Could not load all-time leaderboard.')
-    } finally {
-      setAllTimeLoading(false)
-      setAllTimeRefreshing(false)
+      setLocalLeaderboards(prev => ({
+        ...prev,
+        [targetScope]: {
+          ...prev[targetScope],
+          loading: false,
+          refreshing: false,
+          error: `Could not load ${targetScope} leaderboard.`,
+        }
+      }))
     }
   }
 
   useEffect(() => {
-    if (scope === 'all-time') {
-      fetchAllTimeLeaderboard()
+    if (scope !== 'current') {
+      const current = localLeaderboards[scope]
+      if (current && current.chatters.length === 0 && !current.loading && !current.error) {
+        fetchAllScopesData()
+      }
     }
   }, [scope])
 
+  function fetchAllScopesData() {
+    if (scope !== 'current') {
+      void fetchLocalLeaderboard(scope)
+    }
+  }
+
   // Determine active view variables
-  const activeChatters = scope === 'current' ? leaderboard : allTimeChatters
-  const activeLoading = scope === 'current' ? isLoading : allTimeLoading
-  const activeRefreshing = scope === 'current' ? isRefreshing : allTimeRefreshing
-  const activeError = scope === 'current' ? error : allTimeError
-  const handleRefresh = scope === 'current' ? onRefresh : () => fetchAllTimeLeaderboard(true)
+  const activeChatters = scope === 'current' ? leaderboard : localLeaderboards[scope]?.chatters || []
+  const activeLoading = scope === 'current' ? isLoading : localLeaderboards[scope]?.loading || false
+  const activeRefreshing = scope === 'current' ? isRefreshing : localLeaderboards[scope]?.refreshing || false
+  const activeError = scope === 'current' ? error : localLeaderboards[scope]?.error || null
+  const handleRefresh = scope === 'current' ? onRefresh : () => fetchLocalLeaderboard(scope, true)
+
+  const SCOPES = [
+    { id: 'current', label: 'Current' },
+    { id: 'weekly', label: 'Weekly' },
+    { id: 'monthly', label: 'Monthly' },
+    { id: 'all-time', label: 'All-Time' },
+  ] as const
 
   if (activeLoading) {
     return (
@@ -121,29 +162,21 @@ export default function LeaderboardPanel({
       </div>
 
       {/* Scope Segmented Control */}
-      <div className="grid grid-cols-2 rounded-xl bg-white/[0.03] border border-white/10 p-1 text-xs">
-        <button
-          type="button"
-          onClick={() => setScope('current')}
-          className={`py-1.5 px-3 rounded-lg font-medium transition-all text-center ${
-            scope === 'current'
-              ? 'bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] font-semibold shadow-md'
-              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-          }`}
-        >
-          Current Show
-        </button>
-        <button
-          type="button"
-          onClick={() => setScope('all-time')}
-          className={`py-1.5 px-3 rounded-lg font-medium transition-all text-center ${
-            scope === 'all-time'
-              ? 'bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] font-semibold shadow-md'
-              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-          }`}
-        >
-          All-Time
-        </button>
+      <div className="grid grid-cols-4 rounded-xl bg-white/[0.03] border border-white/10 p-1 text-[10px] sm:text-xs">
+        {SCOPES.map(s => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setScope(s.id)}
+            className={`py-1.5 px-1 rounded-lg font-medium transition-all text-center truncate ${
+              scope === s.id
+                ? 'bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] font-semibold shadow-md'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
 
       {activeChatters.length === 0 ? (

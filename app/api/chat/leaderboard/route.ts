@@ -18,9 +18,12 @@ export async function GET(request: NextRequest) {
 
   // 1. Try PostgreSQL RPC aggregation (recommended, scales well)
   try {
-    const { data: rpcData, error: rpcError } = scope === 'all-time'
-      ? await supabase.rpc('get_all_time_top_chatters', { p_limit: 20 })
-      : await supabase.rpc('get_top_chatters', { p_stream_id: streamId!, p_limit: 20 })
+    const { data: rpcData, error: rpcError } = await supabase
+      .rpc('get_scoped_top_chatters', {
+        p_scope: scope,
+        p_stream_id: scope === 'current' ? streamId : null,
+        p_limit: 20
+      })
 
     if (!rpcError && rpcData) {
       return NextResponse.json({ leaderboard: rpcData })
@@ -35,12 +38,18 @@ export async function GET(request: NextRequest) {
   try {
     let messageQuery = supabase
       .from('chat_messages')
-      .select('member_id, display_name')
+      .select('member_id, display_name, content')
       .eq('is_muted', false)
       .limit(5000) // limit to avoid memory pressure on large chat histories
 
     if (scope === 'current') {
       messageQuery = messageQuery.eq('stream_id', streamId!)
+    } else if (scope === 'weekly') {
+      const weeklySince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      messageQuery = messageQuery.gte('created_at', weeklySince)
+    } else if (scope === 'monthly') {
+      const monthlySince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      messageQuery = messageQuery.gte('created_at', monthlySince)
     }
 
     const [messagesRes, membersRes] = await Promise.all([
@@ -69,6 +78,9 @@ export async function GET(request: NextRequest) {
     for (const msg of messagesRes.data) {
       const activeMember = memberMap.get(msg.member_id)
       if (!activeMember) continue
+      
+      // Exclude automated system notifications
+      if (msg.content?.startsWith('[System]')) continue
 
       if (!tally[msg.member_id]) {
         tally[msg.member_id] = {

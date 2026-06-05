@@ -19,6 +19,7 @@ interface ChatMessageRowProps {
   senderRole: 'ADMIN' | 'MOD' | null
   senderColor?: string | null
   rank?: number
+  chatterMessagesCount?: number
   isMuted: boolean
   isPinned: boolean
   streamId: string | undefined
@@ -43,6 +44,7 @@ function ChatMessageRow({
   senderRole,
   senderColor,
   rank,
+  chatterMessagesCount,
   isMuted,
   isPinned,
   streamId,
@@ -66,6 +68,19 @@ function ChatMessageRow({
   const visibleBadges = normalizeMemberBadges(senderBadges)
 
   const relativeTime = useRelativeTime(message.created_at)
+
+  if (message.content?.startsWith('[System]')) {
+    const cleanContent = message.content.replace('[System]', '').trim()
+    return (
+      <div className="message-appear flex items-center justify-center py-2.5 px-3.5 my-2 rounded-xl border border-[oklch(0.75_0.12_85)]/20 bg-[oklch(0.75_0.12_85)]/[0.03] text-center shadow-md select-none max-w-[85%] mx-auto relative overflow-hidden animate-[pulse_5s_infinite]">
+        <div className="absolute -inset-10 bg-[radial-gradient(circle_at_center,oklch(0.75_0.12_85_/_0.08)_0%,transparent_60%)] pointer-events-none" />
+        <span className="text-[11px] text-[oklch(0.75_0.12_85)] font-semibold tracking-wide flex items-center justify-center gap-1.5 relative z-10 leading-normal">
+          <span>👑</span>
+          <span>{cleanContent}</span>
+        </span>
+      </div>
+    )
+  }
 
   function openContextMenu(e: React.MouseEvent) {
     e.preventDefault()
@@ -143,19 +158,37 @@ function ChatMessageRow({
     return (
       <>
         {rank && rank >= 1 && rank <= 3 && (
-          <span
-            className={`text-[9px] px-1.5 py-0.5 rounded border tracking-wide font-semibold flex items-center gap-1 shrink-0 ${
-              rank === 1
-                ? 'border-amber-400/45 text-amber-300 bg-amber-400/10'
-                : rank === 2
-                ? 'border-slate-300/40 text-slate-200 bg-slate-300/10'
-                : 'border-amber-700/45 text-amber-600 bg-amber-700/10'
-            }`}
-            title={`Top Chatter #${rank}`}
-          >
-            <span>{rank === 1 ? '👑' : rank === 2 ? '🥈' : '🥉'}</span>
-            <span>#{rank}</span>
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded border tracking-wide font-semibold flex items-center gap-1 shrink-0 cursor-default select-none outline-none ${
+                  rank === 1
+                    ? 'border-amber-400/45 text-amber-300 bg-amber-400/10 shadow-sm shadow-amber-400/5'
+                    : rank === 2
+                    ? 'border-slate-300/40 text-slate-200 bg-slate-300/10'
+                    : 'border-amber-700/45 text-amber-600 bg-amber-700/10'
+                }`}
+              >
+                <span>{rank === 1 ? '👑' : rank === 2 ? '🥈' : '🥉'}</span>
+                <span>#{rank}</span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="center" className="glass-heavy border border-white/10 p-2.5 rounded-xl text-xs space-y-1 z-[100] shadow-2xl max-w-[220px] text-foreground">
+              <div className="flex items-center gap-1.5 font-semibold text-[oklch(0.75_0.12_85)]">
+                <span>{rank === 1 ? '👑' : rank === 2 ? '🥈' : '🥉'}</span>
+                <span>Top Chatter #{rank}</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Active engagement rank in this show.
+              </p>
+              {typeof chatterMessagesCount === 'number' && (
+                <div className="flex items-center gap-1 text-[10px] text-foreground/90 font-medium pt-0.5 border-t border-white/5 mt-1">
+                  <span>💬</span>
+                  <span>{chatterMessagesCount} messages this show</span>
+                </div>
+              )}
+            </TooltipContent>
+          </Tooltip>
         )}
         {senderRole && (
           <span className={`text-[9px] px-1.5 py-0.5 rounded border tracking-wide font-medium ${ROLE_BADGE[senderRole].className}`}>

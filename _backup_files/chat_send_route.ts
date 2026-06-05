@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase-server'
-import { createClient as createBrowserClient } from '@supabase/supabase-js'
 import { canModerateChat } from '@/lib/roles'
 import { DEFAULT_SLOW_MODE_DELAY_SECONDS } from '@/lib/chat-settings'
 
@@ -34,32 +33,40 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createServiceClient()
+  const rateLimitSince = new Date(Date.now() - RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString()
 
-  // Check for active timeout
-  const { data: timeout } = await supabase
-    .from('member_timeouts')
-    .select('id, timeout_until')
-    .eq('member_id', member.id)
-    .eq('stream_id', stream_id)
-    .or(`timeout_until.is.null,timeout_until.gt.${new Date().toISOString()}`)
-    .limit(1)
-    .maybeSingle()
+  // Run timeout checks, stream configs, and rate limits in parallel to minimize response time
+  const [timeoutRes, streamRes, rateLimitRes] = await Promise.all([
+    supabase
+      .from('member_timeouts')
+      .select('id, timeout_until')
+      .eq('member_id', member.id)
+      .eq('stream_id', stream_id)
+      .or(`timeout_until.is.null,timeout_until.gt.${new Date().toISOString()}`)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('streams')
+      .select('slow_mode_delay')
+      .eq('id', stream_id)
+      .maybeSingle(),
+    supabase
+      .from('chat_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('member_id', member.id)
+      .eq('stream_id', stream_id)
+      .gte('created_at', rateLimitSince)
+  ])
 
-  if (timeout) {
+  if (timeoutRes.data) {
     return NextResponse.json({ error: 'You are timed out' }, { status: 403 })
   }
 
-  // Check for active slow mode delay
-  const { data: stream, error: streamError } = await supabase
-    .from('streams')
-    .select('slow_mode_delay')
-    .eq('id', stream_id)
-    .single()
-
-  const slowModeDelay = streamError
+  const slowModeDelay = streamRes.error
     ? DEFAULT_SLOW_MODE_DELAY_SECONDS
-    : stream?.slow_mode_delay ?? DEFAULT_SLOW_MODE_DELAY_SECONDS
+    : streamRes.data?.slow_mode_delay ?? DEFAULT_SLOW_MODE_DELAY_SECONDS
 
+  // Perform sequential slow-mode throttling check only if slow mode delay is configured
   if (slowModeDelay > 0 && !canModerateChat(member)) {
     const slowModeSince = new Date(Date.now() - slowModeDelay * 1000).toISOString()
     const { data: lastMessage } = await supabase
@@ -79,15 +86,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const rateLimitSince = new Date(Date.now() - RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString()
-  const { count: recentMessageCount } = await supabase
-    .from('chat_messages')
-    .select('id', { count: 'exact', head: true })
-    .eq('member_id', member.id)
-    .eq('stream_id', stream_id)
-    .gte('created_at', rateLimitSince)
-
-  if ((recentMessageCount ?? 0) >= RATE_LIMIT_MAX_MESSAGES) {
+  if ((rateLimitRes.count ?? 0) >= RATE_LIMIT_MAX_MESSAGES) {
     return NextResponse.json(
       { error: 'Please slow down for a moment before sending another chat message.' },
       { status: 429 }
@@ -112,13 +111,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to send' }, { status: 500 })
   }
 
-  // Broadcast via Supabase Realtime
-  const realtimeClient = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
-  const channel = realtimeClient.channel(`stream:${stream_id}`)
+  // Broadcast via Supabase Realtime (re-using service client connection)
+  const channel = supabase.channel(`stream:${stream_id}`)
   await channel.send({
     type: 'broadcast',
     event: 'new_message',
