@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState, startTransition } from 'react'
-import type { Stream } from '@/lib/database.types'
+import type { Stream, Member } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 import { ROLE_BADGE } from '@/lib/roles'
-import { Trophy, Loader2, RefreshCw, MessageSquare, Award } from 'lucide-react'
+import { Trophy, Loader2, RefreshCw, MessageSquare, Award, Crown } from 'lucide-react'
 
 interface Chatter {
   member_id: string
@@ -18,62 +18,81 @@ interface Chatter {
 
 interface LeaderboardPanelProps {
   stream: Stream | null
+  memberDirectory: Member[]
+  leaderboard: Chatter[]
+  isLoading: boolean
+  isRefreshing: boolean
+  error: string | null
+  onRefresh: () => void
 }
 
-export default function LeaderboardPanel({ stream }: LeaderboardPanelProps) {
-  const [topChatters, setTopChatters] = useState<Chatter[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export default function LeaderboardPanel({
+  stream,
+  memberDirectory,
+  leaderboard,
+  isLoading,
+  isRefreshing,
+  error,
+  onRefresh,
+}: LeaderboardPanelProps) {
+  const [scope, setScope] = useState<'current' | 'all-time'>('current')
+  const [allTimeChatters, setAllTimeChatters] = useState<Chatter[]>([])
+  const [allTimeLoading, setAllTimeLoading] = useState(false)
+  const [allTimeRefreshing, setAllTimeRefreshing] = useState(false)
+  const [allTimeError, setAllTimeError] = useState<string | null>(null)
 
-  async function fetchLeaderboard(refresh = false) {
-    if (!stream?.id) {
-      setIsLoading(false)
-      return
-    }
-
+  async function fetchAllTimeLeaderboard(refresh = false) {
     if (refresh) {
-      setIsRefreshing(true)
+      setAllTimeRefreshing(true)
     } else {
-      setIsLoading(true)
+      setAllTimeLoading(true)
     }
 
     try {
-      const res = await fetch(`/api/chat/leaderboard?stream_id=${stream.id}`)
-      if (!res.ok) throw new Error('Failed to fetch leaderboard')
+      const res = await fetch('/api/chat/leaderboard?scope=all-time')
+      if (!res.ok) throw new Error('Failed to fetch all-time leaderboard')
       const data = await res.json()
       startTransition(() => {
-        setTopChatters(data.leaderboard || [])
-        setError(null)
+        setAllTimeChatters(data.leaderboard || [])
+        setAllTimeError(null)
       })
     } catch (err) {
       console.error(err)
-      setError('Could not load chatter leaderboard.')
+      setAllTimeError('Could not load all-time leaderboard.')
     } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
+      setAllTimeLoading(false)
+      setAllTimeRefreshing(false)
     }
   }
 
   useEffect(() => {
-    fetchLeaderboard()
-  }, [stream?.id])
+    if (scope === 'all-time') {
+      fetchAllTimeLeaderboard()
+    }
+  }, [scope])
 
-  if (isLoading) {
+  // Determine active view variables
+  const activeChatters = scope === 'current' ? leaderboard : allTimeChatters
+  const activeLoading = scope === 'current' ? isLoading : allTimeLoading
+  const activeRefreshing = scope === 'current' ? isRefreshing : allTimeRefreshing
+  const activeError = scope === 'current' ? error : allTimeError
+  const handleRefresh = scope === 'current' ? onRefresh : () => fetchAllTimeLeaderboard(true)
+
+  if (activeLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground gap-3">
         <Loader2 className="w-6 h-6 animate-spin text-[oklch(0.75_0.12_85)]" />
-        <p className="text-xs">Calculating top chatters...</p>
+        <p className="text-xs">Calculating rankings...</p>
       </div>
     )
   }
 
-  if (error) {
+  if (activeError) {
     return (
       <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
-        <p className="text-sm text-destructive font-medium">{error}</p>
+        <p className="text-sm text-destructive font-medium">{activeError}</p>
         <button
-          onClick={() => fetchLeaderboard(true)}
+          onClick={handleRefresh}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold text-foreground transition-all"
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -85,54 +104,92 @@ export default function LeaderboardPanel({ stream }: LeaderboardPanelProps) {
 
   return (
     <div className="space-y-4">
+      {/* Header and Refresh */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-amber-400" />
-          <h3 className="text-xs uppercase tracking-widest text-gold font-semibold leading-none">Top Chatters</h3>
+          <Trophy className="w-4 h-4 text-amber-400 animate-pulse" />
+          <h3 className="text-xs uppercase tracking-widest text-gold font-semibold leading-none">Chat Leaderboard</h3>
         </div>
         <button
-          onClick={() => fetchLeaderboard(true)}
-          disabled={isRefreshing}
+          onClick={handleRefresh}
+          disabled={activeRefreshing}
           className="p-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all disabled:opacity-40"
           title="Refresh leaderboard"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${activeRefreshing ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
-      {topChatters.length === 0 ? (
+      {/* Scope Segmented Control */}
+      <div className="grid grid-cols-2 rounded-xl bg-white/[0.03] border border-white/10 p-1 text-xs">
+        <button
+          type="button"
+          onClick={() => setScope('current')}
+          className={`py-1.5 px-3 rounded-lg font-medium transition-all text-center ${
+            scope === 'current'
+              ? 'bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] font-semibold shadow-md'
+              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+          }`}
+        >
+          Current Show
+        </button>
+        <button
+          type="button"
+          onClick={() => setScope('all-time')}
+          className={`py-1.5 px-3 rounded-lg font-medium transition-all text-center ${
+            scope === 'all-time'
+              ? 'bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] font-semibold shadow-md'
+              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+          }`}
+        >
+          All-Time
+        </button>
+      </div>
+
+      {activeChatters.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-white/10 rounded-xl bg-white/[0.01]">
           <MessageSquare className="w-8 h-8 text-muted-foreground/45 mb-2" />
-          <p className="text-sm text-muted-foreground font-medium">No messages in this stream yet</p>
+          <p className="text-sm text-muted-foreground font-medium">No active chatters found</p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {topChatters.map((chatter, index) => {
+          {activeChatters.map((chatter, index) => {
             const rank = index + 1
             const isTop3 = rank <= 3
-            const visibleBadges = normalizeMemberBadges(chatter.access_badges)
+            
+            // Map senderBadges list from memberDirectory if missing in payload
+            const senderDetails = memberDirectory.find(m => m.id === chatter.member_id)
+            const badges = chatter.access_badges || senderDetails?.access_badges || []
+            const visibleBadges = normalizeMemberBadges(badges)
+            const isMod = chatter.is_moderator || senderDetails?.is_moderator || false
 
-            // Rank visual indicator style
+            // Premium rank colors & visual highlights
             const rankStyles =
               rank === 1
-                ? 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+                ? 'bg-amber-400/20 text-amber-300 border-amber-400/50 shadow-lg shadow-amber-400/5'
                 : rank === 2
-                ? 'bg-slate-300/20 text-slate-200 border-slate-300/40'
+                ? 'bg-slate-300/20 text-slate-200 border-slate-300/50'
                 : rank === 3
-                ? 'bg-amber-700/20 text-amber-600 border-amber-700/40'
+                ? 'bg-amber-700/25 text-amber-600 border-amber-700/50'
                 : 'bg-white/5 text-muted-foreground border-white/10'
 
             return (
               <div
                 key={chatter.member_id}
-                className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all duration-150 group"
+                className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-150 group ${
+                  rank === 1
+                    ? 'border-amber-400/10 bg-amber-400/[0.02] hover:bg-amber-400/[0.04]'
+                    : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05]'
+                }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {/* Rank circle */}
+                  {/* Rank circle with crown/trophy for top chatters */}
                   <div
-                    className={`w-6 h-6 rounded-full border flex items-center justify-center text-[10px] font-bold shrink-0 ${rankStyles}`}
+                    className={`w-6.5 h-6.5 rounded-full border flex items-center justify-center text-[10px] font-bold shrink-0 ${rankStyles}`}
                   >
-                    {isTop3 ? (
+                    {rank === 1 ? (
+                      <Crown className="w-3.5 h-3.5 shrink-0" />
+                    ) : isTop3 ? (
                       <Award className="w-3.5 h-3.5 shrink-0" />
                     ) : (
                       rank
@@ -148,7 +205,7 @@ export default function LeaderboardPanel({ stream }: LeaderboardPanelProps) {
                       >
                         {chatter.display_name}
                       </span>
-                      {chatter.is_moderator && (
+                      {isMod && (
                         <span className={`text-[8px] px-1 py-0.5 rounded border scale-90 tracking-wide font-medium shrink-0 ${ROLE_BADGE.MOD.className}`}>
                           🛡️ MOD
                         </span>

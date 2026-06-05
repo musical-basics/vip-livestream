@@ -8,37 +8,43 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const streamId = searchParams.get('stream_id')
+  const scope = searchParams.get('scope') || 'current'
 
-  if (!streamId) {
-    return NextResponse.json({ error: 'Stream ID is required' }, { status: 400 })
+  if (scope === 'current' && !streamId) {
+    return NextResponse.json({ error: 'Stream ID is required for current show scope' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
 
   // 1. Try PostgreSQL RPC aggregation (recommended, scales well)
   try {
-    const { data: rpcData, error: rpcError } = await supabase
-      .rpc('get_top_chatters', { p_stream_id: streamId, p_limit: 20 })
+    const { data: rpcData, error: rpcError } = scope === 'all-time'
+      ? await supabase.rpc('get_all_time_top_chatters', { p_limit: 20 })
+      : await supabase.rpc('get_top_chatters', { p_stream_id: streamId!, p_limit: 20 })
 
     if (!rpcError && rpcData) {
       return NextResponse.json({ leaderboard: rpcData })
     }
 
-    // If pg error is function not found (code 42883) or similar, fall back to JS aggregation
-    console.warn('RPC get_top_chatters failed or not found, falling back to JS aggregation:', rpcError)
+    console.warn(`RPC for scope ${scope} failed or not found, falling back to JS aggregation:`, rpcError)
   } catch (err) {
     console.error('RPC invocation error:', err)
   }
 
   // 2. JS Fallback Aggregation (safe default if migration hasn't been run)
   try {
+    let messageQuery = supabase
+      .from('chat_messages')
+      .select('member_id, display_name')
+      .eq('is_muted', false)
+      .limit(5000) // limit to avoid memory pressure on large chat histories
+
+    if (scope === 'current') {
+      messageQuery = messageQuery.eq('stream_id', streamId!)
+    }
+
     const [messagesRes, membersRes] = await Promise.all([
-      supabase
-        .from('chat_messages')
-        .select('member_id, display_name')
-        .eq('stream_id', streamId)
-        .eq('is_muted', false)
-        .limit(3000), // reasonably large limit for active stream chat sizes
+      messageQuery,
       supabase
         .from('members')
         .select('id, name, display_name, name_color, access_badges, is_moderator, is_admin')
@@ -62,7 +68,6 @@ export async function GET(request: NextRequest) {
 
     for (const msg of messagesRes.data) {
       const activeMember = memberMap.get(msg.member_id)
-      // Exclude admin messages and deleted/banned members
       if (!activeMember) continue
 
       if (!tally[msg.member_id]) {

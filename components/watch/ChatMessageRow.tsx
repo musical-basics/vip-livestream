@@ -18,6 +18,7 @@ interface ChatMessageRowProps {
   senderBadges?: string[]
   senderRole: 'ADMIN' | 'MOD' | null
   senderColor?: string | null
+  rank?: number
   isMuted: boolean
   isPinned: boolean
   streamId: string | undefined
@@ -41,6 +42,7 @@ function ChatMessageRow({
   senderBadges,
   senderRole,
   senderColor,
+  rank,
   isMuted,
   isPinned,
   streamId,
@@ -56,6 +58,11 @@ function ChatMessageRow({
   const isMod = canModerateChat(currentMember)
   const isOwn = message.member_id === currentMember.id
   const color = nameColor(senderRole, senderBadges, senderColor)
+  const nameStyle = {
+    color,
+    textShadow: rank === 1 ? '0 0 8px oklch(0.75 0.12 85 / 0.35)' : undefined
+  }
+  const nameClassName = `text-xs font-semibold ${rank === 1 ? 'animate-[pulse_4s_infinite]' : ''}`
   const visibleBadges = normalizeMemberBadges(senderBadges)
 
   const relativeTime = useRelativeTime(message.created_at)
@@ -135,6 +142,21 @@ function ChatMessageRow({
   function renderSenderBadges() {
     return (
       <>
+        {rank && rank >= 1 && rank <= 3 && (
+          <span
+            className={`text-[9px] px-1.5 py-0.5 rounded border tracking-wide font-semibold flex items-center gap-1 shrink-0 ${
+              rank === 1
+                ? 'border-amber-400/45 text-amber-300 bg-amber-400/10'
+                : rank === 2
+                ? 'border-slate-300/40 text-slate-200 bg-slate-300/10'
+                : 'border-amber-700/45 text-amber-600 bg-amber-700/10'
+            }`}
+            title={`Top Chatter #${rank}`}
+          >
+            <span>{rank === 1 ? '👑' : rank === 2 ? '🥈' : '🥉'}</span>
+            <span>#{rank}</span>
+          </span>
+        )}
         {senderRole && (
           <span className={`text-[9px] px-1.5 py-0.5 rounded border tracking-wide font-medium ${ROLE_BADGE[senderRole].className}`}>
             <span className="mr-1">{ROLE_BADGE[senderRole].emoji}</span>
@@ -235,7 +257,7 @@ function ChatMessageRow({
         } ${message.status === 'failed' ? 'bg-destructive/10 border border-destructive/20' : ''}`}
       >
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold" style={{ color }}>
+          <span className={nameClassName} style={nameStyle}>
             {message.display_name}
           </span>
           {renderSenderBadges()}
@@ -310,7 +332,7 @@ function ChatMessageRow({
       } ${message.status === 'failed' ? 'bg-destructive/10 border border-destructive/20' : ''}`}
     >
       <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold" style={{ color }}>
+        <span className={nameClassName} style={nameStyle}>
           {message.display_name}
         </span>
         {renderSenderBadges()}

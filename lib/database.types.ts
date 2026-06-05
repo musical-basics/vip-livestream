@@ -303,6 +303,20 @@ export interface Database {
           message_count: number
         }[]
       }
+      get_all_time_top_chatters: {
+        Args: {
+          p_limit?: number
+        }
+        Returns: {
+          member_id: string
+          display_name: string
+          name: string
+          name_color: string | null
+          access_badges: string[]
+          is_moderator: boolean
+          message_count: number
+        }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

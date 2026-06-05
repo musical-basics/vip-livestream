@@ -179,6 +179,87 @@ export default function WatchPageClient({
     }
   }, [selectedStreamSource, selectedSource, streamSources])
 
+  // Leaderboard state & logic
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true)
+  const [isLeaderboardRefreshing, setIsLeaderboardRefreshing] = useState(false)
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null)
+
+  const fetchCurrentLeaderboard = useCallback(async (refresh = false) => {
+    if (!stream?.id) {
+      setIsLeaderboardLoading(false)
+      return
+    }
+
+    if (refresh) {
+      setIsLeaderboardRefreshing(true)
+    } else {
+      setIsLeaderboardLoading(true)
+    }
+
+    try {
+      const res = await fetch(`/api/chat/leaderboard?stream_id=${stream.id}&scope=current`)
+      if (!res.ok) throw new Error('Failed to fetch leaderboard')
+      const data = await res.json()
+      setLeaderboard(data.leaderboard || [])
+      setLeaderboardError(null)
+    } catch (err) {
+      console.error(err)
+      setLeaderboardError('Could not load chatter leaderboard.')
+    } finally {
+      setIsLeaderboardLoading(false)
+      setIsLeaderboardRefreshing(false)
+    }
+  }, [stream?.id])
+
+  useEffect(() => {
+    fetchCurrentLeaderboard()
+  }, [fetchCurrentLeaderboard])
+
+  const handleRealtimeMessage = useCallback((msg: ChatMessage) => {
+    if (!msg.member_id) return
+
+    setLeaderboard((prev) => {
+      const sender = memberDirectory.find(m => m.id === msg.member_id)
+      if (sender && sender.is_admin) {
+        return prev
+      }
+
+      const existingIndex = prev.findIndex((item) => item.member_id === msg.member_id)
+      const next = [...prev]
+
+      if (existingIndex !== -1) {
+        const existing = next[existingIndex]
+        next[existingIndex] = {
+          ...existing,
+          message_count: Number(existing.message_count) + 1,
+          display_name: msg.display_name || existing.display_name
+        }
+      } else {
+        const displayName = msg.display_name || sender?.display_name || sender?.name || 'Guest'
+        next.push({
+          member_id: msg.member_id,
+          display_name: displayName,
+          name: sender?.name || 'Guest',
+          name_color: sender?.name_color || null,
+          access_badges: sender?.access_badges || [],
+          is_moderator: sender?.is_moderator || false,
+          message_count: 1
+        })
+      }
+
+      return next.sort((a, b) => b.message_count - a.message_count).slice(0, 20)
+    })
+  }, [memberDirectory])
+
+  const topChatterRanks = useMemo(() => {
+    const ranks = new Map<string, number>()
+    leaderboard.slice(0, 3).forEach((chatter, index) => {
+      ranks.set(chatter.member_id, index + 1)
+    })
+    return ranks
+  }, [leaderboard])
+
   // Resize state (desktop only)
   const [chatWidth, setChatWidth]       = useState(DEFAULT_CHAT_WIDTH)
   const [videoHeight, setVideoHeight]   = useState(DEFAULT_VIDEO_HEIGHT)
@@ -331,7 +412,7 @@ export default function WatchPageClient({
     }
   }, [])
 
-  // Auto-refresh when the active stream, live state, or YouTube link changes.
+  // Auto-refresh and realtime updates when the active stream changes.
   useEffect(() => {
     const supabase = createClient()
     const statusChannel = supabase
@@ -346,6 +427,9 @@ export default function WatchPageClient({
           .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
           .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
           .on('broadcast', { event: 'stream_updated' }, refreshWatchPage)
+          .on('broadcast', { event: 'new_message' }, ({ payload }) => {
+            handleRealtimeMessage(payload as ChatMessage)
+          })
           .subscribe()
       : null
 
@@ -353,7 +437,7 @@ export default function WatchPageClient({
       supabase.removeChannel(statusChannel)
       if (currentStreamChannel) supabase.removeChannel(currentStreamChannel)
     }
-  }, [stream?.id, refreshWatchPage])
+  }, [stream?.id, refreshWatchPage, handleRealtimeMessage])
 
   // Realtime can be missed if a tab sleeps. Poll lightly as a safety net.
   useEffect(() => {
@@ -491,7 +575,15 @@ export default function WatchPageClient({
         </TabsContent>
 
         <TabsContent value="leaderboard">
-          <LeaderboardPanel stream={stream} />
+          <LeaderboardPanel
+            stream={stream}
+            memberDirectory={memberDirectory}
+            leaderboard={leaderboard}
+            isLoading={isLeaderboardLoading}
+            isRefreshing={isLeaderboardRefreshing}
+            error={leaderboardError}
+            onRefresh={() => fetchCurrentLeaderboard(true)}
+          />
         </TabsContent>
       </Tabs>
     </>
@@ -508,6 +600,7 @@ export default function WatchPageClient({
       onEmojiReaction={addFloatingEmoji}
       onTipBanner={setTipBanner}
       highlightNameEditor={showConcertAnnouncement}
+      topChatterRanks={topChatterRanks}
     />
   )
 

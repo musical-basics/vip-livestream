@@ -132,6 +132,7 @@ interface ChatPanelProps {
   onEmojiReaction: (emoji: string) => void
   onTipBanner: (tip: { name: string; amount: number; message?: string }) => void
   highlightNameEditor?: boolean
+  topChatterRanks?: Map<string, number>
 }
 
 export default function ChatPanel({
@@ -143,6 +144,7 @@ export default function ChatPanel({
   onEmojiReaction,
   onTipBanner,
   highlightNameEditor = false,
+  topChatterRanks,
 }: ChatPanelProps) {
   const streamId = stream?.id
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
@@ -747,6 +749,7 @@ export default function ChatPanel({
                     senderBadges={sender?.access_badges}
                     senderRole={roleLabel(sender)}
                     senderColor={sender?.name_color}
+                    rank={topChatterRanks?.get(msg.member_id)}
                     isMuted={mutedMessageIds.has(msg.id)}
                     streamId={streamId}
                     onDeleted={handleMessageDeleted}
