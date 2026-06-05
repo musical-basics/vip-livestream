@@ -103,6 +103,21 @@ curl -X PATCH https://vip.musicalbasics.com/api/agent/members \
   -d '{ "member_id": "<uuid>", "is_banned": true }'
 ```
 
+### Resend someone's login email ("my password doesn't work")
+
+Emails the auto-login link + their email/password to existing members. It
+reuses their stored password (never rotates), so it always matches what's in
+the DB. Provide `member_id`, `email`, or `emails[]`.
+
+```bash
+curl -X POST https://vip.musicalbasics.com/api/agent/email-credentials \
+  -H "Authorization: Bearer $AGENT_API_KEY" -H "Content-Type: application/json" \
+  -d '{ "email": "someone@example.com" }'
+```
+
+Do NOT regenerate/rotate passwords to "fix" a login — that changes the password
+without delivering it and breaks the account. Just resend with this endpoint.
+
 ### Start, restart, or end the live stream
 
 There is at most one live stream at a time. Setting one live automatically ends
@@ -203,6 +218,12 @@ Notes:
 | POST | `/members` | `{ name, email, is_moderator?, is_admin?, display_name?, access_badges? }` | Add (upserts on email). Returns login credentials. Badges: `vip_member`, `private_student`, `dreamplay_buyer`. |
 | PATCH | `/members` | `{ member_id, display_name?, name?, access_badges?, is_moderator?, is_admin?, is_banned?, regenerate_token? }` | Update. `is_admin` = full access, `is_moderator` = chat-only. Password rotation is disabled: `regenerate_token` does NOT change the password, it just returns the existing `login_url` + `assigned_password`. To deliver credentials, run `scripts/email-livestream-credentials.mjs`. |
 | DELETE | `/members` | `{ member_id }` | Remove a member entirely. |
+
+### Email credentials
+
+| Method | Path | Body / Query | Notes |
+| --- | --- | --- | --- |
+| POST | `/email-credentials` | `{ member_id?, email?, emails?: string[] }` | Email the login link + credentials to existing members. Reuses stored passwords (no rotation). Max 25 recipients; for a full send use the script. Returns per-recipient results. |
 
 ### Chat messages
 

@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
         'PATCH /api/agent/members':  'Update a member. Body: { member_id, display_name?, access_badges?, is_moderator?, is_admin?, is_banned?, regenerate_token? }. Set is_admin for full access, is_moderator for chat-only. NOTE: password rotation is disabled — regenerate_token does NOT change the password; it returns the existing login_url + assigned_password. To deliver credentials, run scripts/email-livestream-credentials.mjs.',
         'DELETE /api/agent/members': 'Remove a member. Body: { member_id }',
       },
+      email: {
+        'POST /api/agent/email-credentials': "Email the livestream login credentials (auto-login link + email/password) to one or more existing members. Body: { member_id?, email?, emails?: string[] } (provide at least one). Reuses each member's stored password (no rotation). Use for 'my password doesn't work' / resend-invite requests.",
+      },
       messages: {
         'GET /api/agent/messages':   'Get chat messages. Query: ?stream_id=<uuid>&limit=50&include_muted=true',
         'PATCH /api/agent/messages': 'Mute or unmute a message. Body: { message_id, stream_id, is_muted: true|false }',
