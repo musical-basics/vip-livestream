@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import type { Stream } from '@/lib/database.types'
-import { Loader2, WifiOff, Clock, Play, Pause, Volume2 } from 'lucide-react'
+import { Loader2, WifiOff, Clock, Play, Pause, Volume2, Settings } from 'lucide-react'
 
 interface VideoPlayerProps {
   stream: Stream | null
@@ -20,6 +20,8 @@ interface YouTubePlayer {
   playVideo?: () => void
   mute?: () => void
   unMute?: () => void
+  getAvailableQualityLevels?: () => string[]
+  setPlaybackQuality?: (suggestedQuality: string) => void
 }
 
 interface YouTubePlayerEvent {
@@ -52,6 +54,17 @@ declare global {
   }
 }
 
+const QUALITY_LABELS: Record<string, string> = {
+  highres: 'Source',
+  hd1080: '1080p',
+  hd720: '720p',
+  large: '480p',
+  medium: '360p',
+  small: '240p',
+  tiny: '240p',
+  default: 'Auto',
+}
+
 export default function VideoPlayer({
   stream,
   fill = false,
@@ -68,9 +81,40 @@ export default function VideoPlayer({
     videoId: string | null
   }>({ isPlaying: false, playerState: 'loading', videoId: null })
   const [isPlayerMuted, setIsPlayerMuted] = useState(true)
+  const [selectedQuality, setSelectedQuality] = useState<string>('default')
+  const [availableQualities, setAvailableQualities] = useState<string[]>([])
+  const [showQualityMenu, setShowQualityMenu] = useState(false)
+
   const hasLiveVideo = !!stream?.is_live && !!videoId
   const playerState = playback.videoId === videoId ? playback.playerState : 'loading'
   const isPlaying = playback.videoId === videoId ? playback.isPlaying : false
+
+  const isSwitching = playback.videoId !== null && playback.videoId !== videoId
+  const loadingText = isSwitching ? 'Loading backup stream, please wait…' : 'Loading, please wait…'
+
+  const qualityOptions = useMemo(() => {
+    const opts = ['default']
+    availableQualities.forEach((q) => {
+      if (q !== 'default' && QUALITY_LABELS[q] && !opts.includes(q)) {
+        opts.push(q)
+      }
+    })
+    return opts
+  }, [availableQualities])
+
+  useEffect(() => {
+    if (!showQualityMenu) return
+
+    function handleGlobalClose(e: Event) {
+      if ((e.target as Element).closest('.quality-menu-container')) {
+        return
+      }
+      setShowQualityMenu(false)
+    }
+
+    window.addEventListener('pointerdown', handleGlobalClose, true)
+    return () => window.removeEventListener('pointerdown', handleGlobalClose, true)
+  }, [showQualityMenu])
 
   const initPlayer = useCallback(() => {
     const playerElement = playerElementRef.current
@@ -116,6 +160,13 @@ export default function VideoPlayer({
             } else {
               event.target.unMute?.()
               setIsPlayerMuted(false)
+            }
+            if (event.target.getAvailableQualityLevels) {
+              const levels = event.target.getAvailableQualityLevels()
+              setAvailableQualities(levels)
+            }
+            if (event.target.setPlaybackQuality) {
+              event.target.setPlaybackQuality('default')
             }
             event.target.playVideo?.()
             setPlayback({ isPlaying: true, playerState: 'ready', videoId })
@@ -234,7 +285,7 @@ export default function VideoPlayer({
         <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-[oklch(0.75_0.12_85)]" />
-            <p className="text-xs text-muted-foreground">Loading stream…</p>
+            <p className="text-xs text-muted-foreground">{loadingText}</p>
           </div>
         </div>
       )}
@@ -265,6 +316,50 @@ export default function VideoPlayer({
             <Play className="ml-0.5 h-5 w-5" aria-hidden="true" />
           )}
         </button>
+      )}
+
+      {playerState === 'ready' && (
+        <div className="quality-menu-container absolute right-4 top-4 z-20 flex flex-col items-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowQualityMenu((v) => !v)}
+            aria-label="Playback settings"
+            title="Playback settings"
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/70 text-white shadow-lg shadow-black/30 backdrop-blur transition-colors hover:bg-black/85 focus:outline-none focus:ring-2 focus:ring-[oklch(0.75_0.12_85)]"
+          >
+            <Settings className={`h-5 w-5 transition-transform duration-200 ${showQualityMenu ? 'rotate-45 text-[oklch(0.75_0.12_85)]' : ''}`} />
+          </button>
+          
+          {showQualityMenu && qualityOptions.length > 0 && (
+            <div className="bg-black/90 border border-white/10 rounded-xl p-1 shadow-2xl backdrop-blur-md min-w-[120px] animate-[fadeIn_0.15s_ease-out] flex flex-col gap-0.5">
+              <p className="text-[9px] text-muted-foreground/60 px-2.5 py-1 uppercase tracking-widest font-semibold select-none">Quality</p>
+              {qualityOptions.map((opt) => {
+                const isSelected = selectedQuality === opt
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => {
+                      if (playerRef.current?.setPlaybackQuality) {
+                        playerRef.current.setPlaybackQuality(opt)
+                      }
+                      setSelectedQuality(opt)
+                      setShowQualityMenu(false)
+                    }}
+                    className={`text-left text-xs px-2.5 py-1.5 rounded-lg transition-colors font-medium flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-[oklch(0.75_0.12_85)]/15 text-[oklch(0.75_0.12_85)] font-semibold'
+                        : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                    }`}
+                  >
+                    <span>{QUALITY_LABELS[opt] || opt}</span>
+                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.75_0.12_85)]" />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {playerState === 'ready' && isPlayerMuted && (
