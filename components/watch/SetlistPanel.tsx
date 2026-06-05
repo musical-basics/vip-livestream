@@ -65,7 +65,7 @@ export default function SetlistPanel({ stream }: SetlistPanelProps) {
       {setlist.map((item, idx) => (
         <div key={item.id} className="glass rounded-xl overflow-hidden">
           <button
-            className="w-full flex items-start gap-4 px-4 py-4 text-left hover:bg-white/3 transition-colors group"
+            className="group flex w-full items-start gap-3 px-3 py-4 text-left transition-colors hover:bg-white/3 sm:gap-4 sm:px-4"
             onClick={() => setExpanded(expanded === item.id ? null : item.id)}
           >
             <span
@@ -107,7 +107,7 @@ export default function SetlistPanel({ stream }: SetlistPanelProps) {
 
           {expanded === item.id && (
             <div className="px-4 pb-4 pt-0 border-t border-white/5">
-              <div className="grid grid-cols-2 gap-3 text-sm mt-3">
+              <div className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <p className="text-[10px] tracking-widest uppercase text-muted-foreground mb-1">Performer</p>
                   <p className="text-foreground/80">{item.performer}</p>

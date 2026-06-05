@@ -68,7 +68,7 @@ export default function TipButton({ member, stream }: TipButtonProps) {
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-xl text-sm font-medium px-4 py-2"
+        className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium sm:w-auto"
         style={{
           background: 'linear-gradient(135deg, oklch(0.68 0.22 350), oklch(0.55 0.18 320))',
           color: 'white',

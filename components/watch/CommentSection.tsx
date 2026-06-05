@@ -52,7 +52,7 @@ export default function CommentSection({ member, stream, initialComments }: Comm
   return (
     <div className="space-y-6">
       {/* Post form */}
-      <div className="glass rounded-2xl p-5">
+      <div className="glass rounded-2xl p-4 sm:p-5">
         <h3
           className="text-lg font-light mb-4"
           style={{ fontFamily: "'Cormorant Garamond', serif", color: 'oklch(0.75 0.12 85)' }}
@@ -76,7 +76,7 @@ export default function CommentSection({ member, stream, initialComments }: Comm
               maxLength={1000}
               className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm resize-none focus:outline-none focus:border-[oklch(0.75_0.12_85)] focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] transition-colors placeholder:text-muted-foreground/40 leading-relaxed"
             />
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-[11px] text-muted-foreground/50">{content.length}/1000</span>
               <Button
                 type="submit"

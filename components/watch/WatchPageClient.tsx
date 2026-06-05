@@ -296,7 +296,7 @@ export default function WatchPageClient({
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex min-h-[100dvh] flex-col lg:h-screen lg:overflow-hidden">
       <Header member={member} stream={stream} />
       {resizeMode && (
         <div
@@ -316,15 +316,15 @@ export default function WatchPageClient({
       )}
 
       {/* ── Main layout ───────────────────────────────── */}
-      <div ref={mainLayoutRef} className="flex min-h-0 flex-1 flex-col lg:flex-row gap-0 overflow-hidden">
+      <div ref={mainLayoutRef} className="flex flex-1 flex-col gap-0 lg:min-h-0 lg:flex-row lg:overflow-hidden">
 
         {/* ── Left column: Video + Tabs ── */}
-        <div ref={leftColumnRef} className="flex-1 flex min-h-0 flex-col min-w-0 overflow-hidden">
+        <div ref={leftColumnRef} className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
 
           {/* Video player */}
           <div
             ref={videoWrapRef}
-            className="relative flex-shrink-0"
+            className="relative w-full flex-shrink-0 bg-black"
             style={isDesktop ? { height: videoHeight } : undefined}
           >
             <VideoPlayer stream={stream} fill={isDesktop} />
@@ -336,12 +336,12 @@ export default function WatchPageClient({
 
           {/* Below video: tabs */}
           <div
-            className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6"
+            className="flex-1 p-3 pb-6 sm:p-4 lg:min-h-0 lg:overflow-y-auto lg:p-6"
           >
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-              <div>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <h2
-                  className="text-2xl font-light text-gold"
+                  className="text-xl font-light leading-tight text-gold sm:text-2xl"
                   style={{ fontFamily: "'Cormorant Garamond', serif" }}
                 >
                   {stream?.title || 'VIP Piano Livestream'}
@@ -350,16 +350,18 @@ export default function WatchPageClient({
                   <p className="text-sm text-muted-foreground mt-1">{stream.description}</p>
                 )}
               </div>
-              <TipButton member={member} stream={stream} />
+              <div className="w-full sm:w-auto">
+                <TipButton member={member} stream={stream} />
+              </div>
             </div>
 
             <Tabs defaultValue="setlist">
-              <TabsList className="glass mb-4">
-                <TabsTrigger value="setlist" className="flex items-center gap-2">
+              <TabsList className="glass mb-4 grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+                <TabsTrigger value="setlist" className="flex items-center justify-center gap-2">
                   <Music2 className="w-3.5 h-3.5" />
                   <span>Programme</span>
                 </TabsTrigger>
-                <TabsTrigger value="comments" className="flex items-center gap-2">
+                <TabsTrigger value="comments" className="flex items-center justify-center gap-2">
                   <MessageCircle className="w-3.5 h-3.5" />
                   <span>Leave a Note</span>
                 </TabsTrigger>
@@ -385,7 +387,7 @@ export default function WatchPageClient({
 
         {/* ── Right: Chat panel ── */}
         <div
-          className="flex flex-col border-t lg:border-t-0 lg:border-l border-border/50"
+          className="flex h-[min(70dvh,560px)] min-h-[420px] flex-col border-t border-border/50 lg:h-auto lg:min-h-0 lg:border-l lg:border-t-0"
           style={isDesktop
             ? { width: chatWidth, flexShrink: 0 }
             : { width: '100%' }

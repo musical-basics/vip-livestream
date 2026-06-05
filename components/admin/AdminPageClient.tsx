@@ -176,14 +176,15 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     : []
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       {/* Header */}
-      <header className="glass-heavy border-b border-border/50 px-6 py-4 flex items-center gap-4">
-        <Link href="/watch" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
+      <header className="glass-heavy flex flex-wrap items-center gap-3 border-b border-border/50 px-4 py-4 sm:gap-4 sm:px-6">
+        <Link href="/watch" className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="w-4 h-4" />
-          Back to Stream
+          <span className="hidden min-[360px]:inline">Back to Stream</span>
+          <span className="min-[360px]:hidden">Back</span>
         </Link>
-        <Separator orientation="vertical" className="h-5 opacity-30" />
+        <Separator orientation="vertical" className="hidden h-5 opacity-30 sm:block" />
         <div className="flex items-center gap-2">
           <Settings className="w-4 h-4 text-[oklch(0.75_0.12_85)]" />
           <span
@@ -194,23 +195,23 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
           </span>
         </div>
         {liveStream && (
-          <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
+          <div className="min-w-0 flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 sm:ml-auto">
             <Radio className="w-3 h-3 text-red-400" />
-            <span className="text-xs font-semibold text-red-400 tracking-widest uppercase">
+            <span className="truncate text-xs font-semibold uppercase tracking-widest text-red-400">
               Live: {liveStream.title}
             </span>
           </div>
         )}
       </header>
 
-      <div className="max-w-5xl mx-auto p-6">
+      <div className="mx-auto max-w-5xl p-4 sm:p-6">
         <Tabs defaultValue="streams">
-          <TabsList className="glass mb-6">
-            <TabsTrigger value="streams" className="flex items-center gap-2">
+          <TabsList className="glass mb-6 grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+            <TabsTrigger value="streams" className="flex items-center justify-center gap-2">
               <Tv className="w-3.5 h-3.5" />
               Streams
             </TabsTrigger>
-            <TabsTrigger value="members" className="flex items-center gap-2">
+            <TabsTrigger value="members" className="flex items-center justify-center gap-2">
               <Users className="w-3.5 h-3.5" />
               Members ({memberList.length})
             </TabsTrigger>
@@ -235,7 +236,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
 
             {/* Create stream form */}
             {isCreating && (
-              <div className="glass rounded-2xl p-6 space-y-4">
+              <div className="glass space-y-4 rounded-2xl p-4 sm:p-6">
                 <h3
                   className="text-xl font-light text-gold"
                   style={{ fontFamily: "'Cormorant Garamond', serif" }}
@@ -293,11 +294,11 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                     className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm resize-y focus:outline-none focus:border-[oklch(0.75_0.12_85)] transition-colors font-mono text-xs"
                   />
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
                     onClick={createStream}
                     disabled={loadingId === 'new' || !newStream.title || !newStream.youtube_video_id}
-                    className="flex items-center gap-2 rounded-xl"
+                    className="flex items-center justify-center gap-2 rounded-xl"
                     style={{
                       background: 'linear-gradient(135deg, oklch(0.75 0.12 85), oklch(0.60 0.10 70))',
                       color: 'oklch(0.09 0.015 270)',
@@ -329,7 +330,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                 </div>
               )}
               {currentStream && [currentStream].map((stream) => (
-                <div key={stream.id} className={`glass rounded-2xl p-5 border ${stream.is_live ? 'border-red-500/30' : 'border-white/8'}`}>
+                <div key={stream.id} className={`glass rounded-2xl border p-4 sm:p-5 ${stream.is_live ? 'border-red-500/30' : 'border-white/8'}`}>
                   <div className="flex items-start gap-4 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -374,7 +375,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                       onClick={() => toggleLive(stream)}
                       disabled={loadingId === stream.id}
                       size="sm"
-                      className="rounded-xl shrink-0 flex items-center gap-2"
+                      className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl sm:w-auto"
                       style={stream.is_live ? {
                         background: 'oklch(0.20 0.02 270)',
                         border: '1px solid oklch(0.65 0.22 25 / 0.4)',
@@ -403,7 +404,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                 </div>
               )}
               {archivedStreams.map((stream) => (
-                <div key={stream.id} className="glass rounded-2xl p-5 border border-white/8 opacity-80">
+                <div key={stream.id} className="glass rounded-2xl border border-white/8 p-4 opacity-80 sm:p-5">
                   <div className="flex items-start gap-4 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -444,7 +445,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                       onClick={() => toggleLive(stream)}
                       disabled={loadingId === stream.id}
                       size="sm"
-                      className="rounded-xl shrink-0 flex items-center gap-2"
+                      className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl sm:w-auto"
                       style={{
                         background: 'linear-gradient(135deg, oklch(0.60 0.22 25), oklch(0.45 0.18 10))',
                         color: 'white',
@@ -470,7 +471,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
             {memberList.map((m) => (
               <div
                 key={m.id}
-                className={`glass rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap ${m.is_banned ? 'opacity-50' : ''}`}
+                className={`glass flex flex-wrap items-center gap-3 rounded-xl px-3 py-3 sm:px-4 ${m.is_banned ? 'opacity-50' : ''}`}
               >
                 {/* Avatar */}
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[oklch(0.75_0.12_85)] to-[oklch(0.55_0.10_70)] flex items-center justify-center text-xs font-bold text-[oklch(0.09_0.015_270)] shrink-0">
@@ -520,7 +521,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
+                <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-3 sm:w-auto">
                   <div className="flex items-center gap-1 rounded-xl border border-white/8 bg-white/5 p-1">
                     {MEMBER_BADGES.map((badge) => {
                       const isSelected = normalizeMemberBadges(m.access_badges).includes(badge.id)

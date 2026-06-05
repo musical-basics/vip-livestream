@@ -22,15 +22,15 @@ export default function Header({ member, stream }: HeaderProps) {
   }
 
   return (
-    <header className="glass-heavy border-b border-border/50 px-4 lg:px-6 py-3 flex items-center justify-between z-30 relative">
+    <header className="glass-heavy sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border/50 px-3 py-3 sm:px-4 lg:px-6">
       {/* Brand */}
-      <div className="flex items-center gap-3">
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[oklch(0.78_0.13_85)] to-[oklch(0.55_0.10_70)] flex items-center justify-center text-sm">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[oklch(0.78_0.13_85)] to-[oklch(0.55_0.10_70)] text-sm">
           🎹
         </div>
-        <div>
+        <div className="min-w-0">
           <h1
-            className="text-lg font-light leading-none text-gold"
+            className="truncate text-base font-light leading-none text-gold sm:text-lg"
             style={{ fontFamily: "'Cormorant Garamond', serif" }}
           >
             Musical Basics
@@ -43,7 +43,7 @@ export default function Header({ member, stream }: HeaderProps) {
 
       {/* Center: live badge */}
       {stream?.is_live && (
-        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
+        <div className="hidden items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 sm:flex">
           <Radio className="w-3 h-3 text-red-400" />
           <span className="text-xs font-semibold text-red-400 tracking-widest uppercase">
             Live
@@ -52,7 +52,7 @@ export default function Header({ member, stream }: HeaderProps) {
       )}
 
       {/* Right: member info + logout */}
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <div className="hidden sm:flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[oklch(0.75_0.12_85)] to-[oklch(0.55_0.10_70)] flex items-center justify-center text-[10px] font-bold text-[oklch(0.09_0.015_270)]">
             {(member.display_name || member.name)[0]?.toUpperCase()}

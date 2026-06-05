@@ -43,7 +43,6 @@ export default function ChatPanel({
   const [mutedMessageIds, setMutedMessageIds] = useState<Set<string>>(new Set())
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const memberById = useMemo(() => {
     const map = new Map(memberDirectory.map((directoryMember) => [directoryMember.id, directoryMember]))
@@ -53,7 +52,9 @@ export default function ChatPanel({
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = scrollRef.current
+    if (!container) return
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
   }, [])
 
   useEffect(() => {
@@ -194,9 +195,9 @@ export default function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col flex-1 h-full min-h-0 max-h-[calc(100vh-56px)] lg:max-h-none">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       {/* Online count + display name */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border/30">
+      <div className="flex items-center justify-between border-b border-border/30 px-3 py-2 sm:px-4">
         <DisplayNameEditor
           member={member}
           displayName={displayName}
@@ -211,7 +212,7 @@ export default function ChatPanel({
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-3 space-y-1 min-h-0"
+        className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-3 space-y-1"
       >
         {/* Load more button */}
         {hasMore && (
@@ -255,7 +256,6 @@ export default function ChatPanel({
             )
           })()
         ))}
-        <div ref={bottomRef} />
       </div>
 
       {/* Emoji picker overlay */}
@@ -266,7 +266,7 @@ export default function ChatPanel({
       )}
 
       {/* Input area */}
-      <div className="border-t border-border/30 p-3 glass-heavy">
+      <div className="glass-heavy border-t border-border/30 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         {isMuted ? (
           <div className="text-center py-3">
             <p className="text-xs text-muted-foreground">
@@ -282,12 +282,12 @@ export default function ChatPanel({
               placeholder="Say something…"
               rows={1}
               maxLength={500}
-              className="flex-1 resize-none bg-white/5 rounded-xl px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] border border-white/8 min-h-[40px] max-h-[100px] overflow-y-auto"
+              className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/8 bg-white/5 px-3 py-2.5 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] sm:text-sm max-h-[100px] overflow-y-auto"
               style={{ fieldSizing: 'content' } as any}
             />
             <button
               onClick={() => setShowEmojiPicker((v) => !v)}
-              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/8 text-muted-foreground hover:text-foreground"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
               title="Emoji reactions"
             >
               <Smile className="w-4 h-4" />
@@ -296,7 +296,7 @@ export default function ChatPanel({
               onClick={() => sendMessage()}
               disabled={isSending || !input.trim()}
               size="sm"
-              className="rounded-xl px-3 py-2.5 h-auto"
+              className="h-11 shrink-0 rounded-xl px-3"
               style={{
                 background: input.trim()
                   ? 'linear-gradient(135deg, oklch(0.75 0.12 85), oklch(0.60 0.10 70))'

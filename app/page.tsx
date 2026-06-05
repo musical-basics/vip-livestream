@@ -10,7 +10,7 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
+    <main className="flex min-h-[100dvh] items-center justify-center px-4 py-6 sm:p-4">
       {/* Background piano keys subtle illustration */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-32 opacity-5">
@@ -31,7 +31,7 @@ export default async function HomePage() {
 
       <div className="relative w-full max-w-md">
         {/* Logo / branding */}
-        <div className="text-center mb-10">
+        <div className="mb-8 text-center sm:mb-10">
           <div className="inline-flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[oklch(0.75_0.12_85)] to-[oklch(0.55_0.10_70)] flex items-center justify-center">
               <span className="text-sm">🎹</span>
@@ -41,7 +41,7 @@ export default async function HomePage() {
             </span>
           </div>
           <h1
-            className="text-5xl font-light text-gold mb-3"
+            className="mb-3 text-4xl font-light text-gold sm:text-5xl"
             style={{ fontFamily: "'Cormorant Garamond', serif" }}
           >
             VIP Livestream
@@ -54,7 +54,7 @@ export default async function HomePage() {
         </div>
 
         {/* Login card */}
-        <div className="glass rounded-2xl p-8 shadow-2xl">
+        <div className="glass rounded-2xl p-6 shadow-2xl sm:p-8">
           <LoginForm />
         </div>
 
