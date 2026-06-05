@@ -36,6 +36,40 @@ function appendMessage(messages: ChatMessage[], message: ChatMessage, currentMem
   return next.length > MAX_MESSAGES_IN_MEMORY ? next.slice(-MAX_MESSAGES_IN_MEMORY) : next
 }
 
+const POPULAR_EMOJIS = [
+  { char: '❤️', name: 'heart', search: 'heart love like <3' },
+  { char: '🔥', name: 'fire', search: 'fire hot lit awesome' },
+  { char: '👏', name: 'clap', search: 'clap applause bravo hand' },
+  { char: '🎹', name: 'piano', search: 'piano music keyboard instrument' },
+  { char: '😂', name: 'joy', search: 'joy laugh lol haha tear' },
+  { char: '🙂', name: 'smile', search: 'smile happy face :)' },
+  { char: '😀', name: 'grinning', search: 'grinning happy face :D' },
+  { char: '😮', name: 'astonished', search: 'astonished face oh :O' },
+  { char: '😉', name: 'wink', search: 'wink face ;)' },
+  { char: '🙁', name: 'slight_frown', search: 'slight frown sad face :(' },
+  { char: '😕', name: 'confused', search: 'confused face :/' },
+  { char: '😛', name: 'stuck_out_tongue', search: 'tongue face :P' },
+  { char: '😆', name: 'laughing', search: 'laughing lol xD' },
+  { char: '😎', name: 'sunglasses', search: 'sunglasses cool B)' },
+  { char: '👍', name: 'thumbsup', search: 'thumbsup thumbs up yes ok' },
+  { char: '🎉', name: 'tada', search: 'tada party celebrate congrats' },
+  { char: '✨', name: 'sparkles', search: 'sparkles shiny clean' },
+  { char: '🌟', name: 'star', search: 'star bright' },
+  { char: '💯', name: '100', search: '100 perfect absolute' },
+  { char: '🥹', name: 'pleading', search: 'pleading hold tears' },
+  { char: '😭', name: 'cry', search: 'cry sad sob' },
+  { char: '🫶', name: 'heart_hands', search: 'heart hands love' },
+  { char: '🎵', name: 'note', search: 'note music melody' },
+  { char: '🎶', name: 'notes', search: 'notes music melody' },
+  { char: '🤯', name: 'mind_blown', search: 'mind blown shocked' },
+  { char: '👀', name: 'eyes', search: 'eyes look see' },
+  { char: '🙌', name: 'raised_hands', search: 'raised hands celebration' },
+  { char: '🚀', name: 'rocket', search: 'rocket launch fast' },
+  { char: '🥳', name: 'partying_face', search: 'party face celebrate' },
+  { char: '😍', name: 'heart_eyes', search: 'heart eyes love' },
+  { char: '🤩', name: 'star_struck', search: 'star struck wow' },
+]
+
 const EMOTICON_MAP: Record<string, string> = {
   '<3': '❤️',
   ':lol:': '😂',
@@ -136,6 +170,13 @@ export default function ChatPanel({
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(null)
   const [activeMenuPosition, setActiveMenuPosition] = useState<{ x: number; y: number } | null>(null)
+  const [autocomplete, setAutocomplete] = useState<{
+    query: string
+    startIndex: number
+    endIndex: number
+    matches: typeof POPULAR_EMOJIS
+    selectedIndex: number
+  } | null>(null)
   const handleActiveMenuChange = useCallback(
     (messageId: string | null, position: { x: number; y: number } | null) => {
       setActiveMenuMessageId(messageId)
@@ -203,6 +244,7 @@ export default function ChatPanel({
     return map
   }, [memberDirectory, member])
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual manages mutable measurements internally.
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollRef.current,
@@ -362,6 +404,27 @@ export default function ChatPanel({
       supabase.removeChannel(channel)
     }
   }, [streamId, member.id, displayName, onTipBanner, supabase, spawnEmojiBurst, onEmojiReaction])
+
+  const selectAutocompleteEmoji = useCallback((emojiChar: string) => {
+    if (!autocomplete) return
+    const before = input.slice(0, autocomplete.startIndex)
+    const after = input.slice(autocomplete.endIndex)
+    const newVal = before + emojiChar + ' '
+    setInput(newVal)
+    if (streamId) {
+      localStorage.setItem(`draft_chat_${streamId}`, newVal)
+    }
+    setAutocomplete(null)
+
+    setTimeout(() => {
+      const textarea = document.querySelector('.chat-input-textarea') as HTMLTextAreaElement
+      if (textarea) {
+        textarea.focus()
+        const newCursorPos = autocomplete.startIndex + emojiChar.length + 1
+        textarea.setSelectionRange(newCursorPos, newCursorPos)
+      }
+    }, 0)
+  }, [input, autocomplete, streamId])
 
   const sendMessage = useCallback(async (content?: string, emoji?: string) => {
     if (!streamId) return
@@ -523,6 +586,44 @@ export default function ChatPanel({
   }, [streamId, pinnedMessage])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (autocomplete) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setAutocomplete((prev) => {
+          if (!prev) return null
+          return {
+            ...prev,
+            selectedIndex: (prev.selectedIndex + 1) % prev.matches.length,
+          }
+        })
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setAutocomplete((prev) => {
+          if (!prev) return null
+          return {
+            ...prev,
+            selectedIndex: (prev.selectedIndex - 1 + prev.matches.length) % prev.matches.length,
+          }
+        })
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        const selectedEmoji = autocomplete.matches[autocomplete.selectedIndex]
+        if (selectedEmoji) {
+          selectAutocompleteEmoji(selectedEmoji.char)
+        }
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setAutocomplete(null)
+        return
+      }
+    }
+
     if (e.key === 'Enter') {
       const isMobile = typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent)
       if (isMobile || !e.shiftKey) {
@@ -667,7 +768,30 @@ export default function ChatPanel({
       )}
 
       {/* Input area */}
-      <div className="glass-heavy border-t border-border/30 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <div className="glass-heavy border-t border-border/30 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] relative">
+        {autocomplete && (
+          <div className="absolute bottom-[calc(100%+8px)] left-3 right-3 z-30 bg-black/95 border border-white/10 rounded-xl p-1 shadow-2xl backdrop-blur-md max-w-sm flex flex-col gap-0.5 animate-[fadeIn_0.15s_ease-out]">
+            <p className="text-[9px] text-muted-foreground/60 px-2.5 py-1.5 uppercase tracking-widest font-semibold select-none border-b border-white/5 mb-0.5">Emoji Suggestions</p>
+            {autocomplete.matches.map((emoji, idx) => {
+              const isSelected = idx === autocomplete.selectedIndex
+              return (
+                <button
+                  key={emoji.name}
+                  type="button"
+                  onClick={() => selectAutocompleteEmoji(emoji.char)}
+                  className={`text-left text-xs px-2.5 py-1.5 rounded-lg transition-colors font-medium flex items-center gap-2 ${
+                    isSelected
+                      ? 'bg-[oklch(0.75_0.12_85)] text-[oklch(0.09_0.015_270)] font-semibold'
+                      : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                  }`}
+                >
+                  <span className="text-base">{emoji.char}</span>
+                  <span className={isSelected ? 'text-[oklch(0.09_0.015_270)]/80' : 'text-muted-foreground/75'}>:{emoji.name}:</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
         {isMuted ? (
           <div className="text-center py-3">
             <p className="text-xs text-muted-foreground">
@@ -718,13 +842,42 @@ export default function ChatPanel({
                   if (streamId) {
                     localStorage.setItem(`draft_chat_${streamId}`, val)
                   }
+
+                  // Autocomplete detection
+                  const selectionStart = e.target.selectionStart
+                  const textBeforeCursor = val.slice(0, selectionStart)
+                  const match = textBeforeCursor.match(/:([a-zA-Z0-9_+-]*)$/)
+
+                  if (match) {
+                    const query = match[1]
+                    const startIndex = selectionStart - match[0].length
+                    const filtered = POPULAR_EMOJIS.filter(
+                      (emoji) =>
+                        emoji.name.includes(query.toLowerCase()) ||
+                        emoji.search.includes(query.toLowerCase())
+                    ).slice(0, 6)
+
+                    if (filtered.length > 0) {
+                      setAutocomplete({
+                        query,
+                        startIndex,
+                        endIndex: selectionStart,
+                        matches: filtered,
+                        selectedIndex: 0,
+                      })
+                    } else {
+                      setAutocomplete(null)
+                    }
+                  } else {
+                    setAutocomplete(null)
+                  }
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="Say something…"
                 disabled={!streamId}
                 rows={1}
                 maxLength={500}
-                className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/8 bg-white/5 px-3 py-2.5 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm max-h-[100px] overflow-y-auto"
+                className="chat-input-textarea min-h-[44px] flex-1 resize-none rounded-xl border border-white/8 bg-white/5 px-3 py-2.5 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm max-h-[100px] overflow-y-auto"
                 style={textareaAutoSizeStyle}
               />
               <button
