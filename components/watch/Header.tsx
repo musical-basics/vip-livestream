@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import type { Member, Stream } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
-import { LogOut, Radio, Settings } from 'lucide-react'
+import { LogOut, Radio, Settings, Film } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface HeaderProps {
@@ -80,6 +80,14 @@ export default function Header({ member, stream }: HeaderProps) {
             )
           })}
         </div>
+        <a
+          href="/recordings"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-white/8"
+          title="Video recordings"
+        >
+          <Film className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Recordings</span>
+        </a>
         {member.is_moderator && (
           <a
             href="/admin"
@@ -94,10 +102,11 @@ export default function Header({ member, stream }: HeaderProps) {
           variant="ghost"
           size="sm"
           onClick={handleLogout}
-          className="text-muted-foreground hover:text-foreground rounded-lg h-8 px-2.5"
-          title="Leave"
+          className="flex items-center gap-1 text-muted-foreground hover:text-foreground rounded-lg h-8 px-2.5"
+          title="Log out"
         >
           <LogOut className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline text-xs">Log out</span>
         </Button>
       </div>
     </header>

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { Film, LogIn } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import LoginForm from '@/components/LoginForm'
 
@@ -17,7 +18,27 @@ export default async function HomePage({
   const { email, pw } = await searchParams
 
   return (
-    <main className="flex min-h-[100dvh] items-center justify-center px-4 py-6 sm:p-4">
+    <main className="relative flex min-h-[100dvh] items-center justify-center px-4 py-6 sm:p-4">
+      {/* Top-right nav: recordings + login */}
+      <nav className="absolute right-0 top-0 z-20 flex items-center gap-1.5 p-3 sm:gap-2 sm:p-4">
+        <a
+          href="/recordings"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-white/8 hover:text-foreground"
+          title="Video recordings"
+        >
+          <Film className="h-3.5 w-3.5" />
+          <span>Video Recordings</span>
+        </a>
+        <a
+          href="#login-card"
+          className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-white/8"
+          title="Log in"
+        >
+          <LogIn className="h-3.5 w-3.5" />
+          <span>Log in</span>
+        </a>
+      </nav>
+
       {/* Background piano keys subtle illustration */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-32 opacity-5">
@@ -61,7 +82,7 @@ export default async function HomePage({
         </div>
 
         {/* Login card */}
-        <div className="glass rounded-2xl p-6 shadow-2xl sm:p-8">
+        <div id="login-card" className="glass scroll-mt-20 rounded-2xl p-6 shadow-2xl sm:p-8">
           <LoginForm defaultEmail={email ?? ''} defaultPassword={pw ?? ''} />
         </div>
 

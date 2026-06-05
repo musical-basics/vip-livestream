@@ -36,7 +36,6 @@ function formatDate(value: string | null) {
 export default async function RecordingsPage() {
   const member = await getSession()
   if (!member) redirect('/')
-  if (!member.is_moderator) redirect('/watch')
 
   const supabase = createServiceClient()
   const { data } = await supabase
@@ -60,9 +59,12 @@ export default async function RecordingsPage() {
   return (
     <main className="min-h-[100dvh]">
       <header className="glass-heavy flex flex-wrap items-center gap-3 border-b border-border/50 px-4 py-4 sm:px-6">
-        <Link href="/admin" className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+        <Link
+          href={member.is_moderator ? '/admin' : '/watch'}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
           <ArrowLeft className="h-4 w-4" />
-          Back to Admin
+          {member.is_moderator ? 'Back to Admin' : 'Back to Livestream'}
         </Link>
         <div className="flex items-center gap-2">
           <Archive className="h-4 w-4 text-[oklch(0.75_0.12_85)]" />
@@ -78,7 +80,7 @@ export default async function RecordingsPage() {
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         <div className="mb-6 max-w-2xl">
           <p className="text-sm text-muted-foreground">
-            Archived stream links for moderator testing and verification. These recordings are hidden from the viewer watch page.
+            Rewatch past livestream performances.
           </p>
         </div>
 
@@ -109,9 +111,11 @@ export default async function RecordingsPage() {
                       >
                         {stream.title}
                       </h2>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground">
-                        ID: {stream.youtube_video_id}
-                      </p>
+                      {member.is_moderator && (
+                        <p className="mt-1 font-mono text-xs text-muted-foreground">
+                          ID: {stream.youtube_video_id}
+                        </p>
+                      )}
                     </div>
                     <Badge variant="outline" className="border-white/15 text-[10px] text-muted-foreground">
                       ARCHIVED
