@@ -107,7 +107,15 @@ export default function WatchPageClient({
   const router = useRouter()
 
   const [floatingEmojis, setFloatingEmojis] = useState<Array<{ id: string; emoji: string; x: number }>>([])
-  const [tipBanner, setTipBanner]           = useState<{ name: string; amount: number; message?: string } | null>(null)
+  const [tipBanner, setTipBanner] = useState<{ name: string; amount: number; message?: string } | null>(
+    () => searchParams.get('tip_success')
+      ? {
+          name: member.display_name || member.name,
+          amount: 0,
+          message: 'Thank you for your support! 💝',
+        }
+      : null
+  )
 
   // Resize state (desktop only)
   const [chatWidth, setChatWidth]       = useState(DEFAULT_CHAT_WIDTH)
@@ -277,16 +285,12 @@ export default function WatchPageClient({
 
   // Show tip success notification
   useEffect(() => {
-    if (searchParams.get('tip_success')) {
-      setTipBanner({
-        name: member.display_name || member.name,
-        amount: 0,
-        message: 'Thank you for your support! 💝',
-      })
-      router.replace('/watch')
-      setTimeout(() => setTipBanner(null), 5000)
-    }
-  }, [searchParams, member, router])
+    if (!searchParams.get('tip_success')) return
+
+    router.replace('/watch')
+    const timeout = window.setTimeout(() => setTipBanner(null), 5000)
+    return () => window.clearTimeout(timeout)
+  }, [searchParams, router])
 
   function addFloatingEmoji(emoji: string) {
     const id = `${Date.now()}-${Math.random()}`
@@ -295,27 +299,6 @@ export default function WatchPageClient({
     setTimeout(() => {
       setFloatingEmojis(prev => prev.filter(e => e.id !== id))
     }, 2600)
-  }
-
-  if (!stream?.is_live) {
-    return (
-      <div className="flex min-h-[100dvh] flex-col">
-        <Header member={member} stream={stream} />
-        {tipBanner && (
-          <TipBanner
-            name={tipBanner.name}
-            amount={tipBanner.amount}
-            message={tipBanner.message}
-            onClose={() => setTipBanner(null)}
-          />
-        )}
-        <main className="flex flex-1 items-center justify-center px-4 py-8">
-          <div className="w-full max-w-4xl">
-            <VideoPlayer stream={stream} />
-          </div>
-        </main>
-      </div>
-    )
   }
 
   return (
