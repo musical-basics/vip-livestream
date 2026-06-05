@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronUp, Music2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { DEFAULT_SETLIST } from '@/lib/default-setlist'
 
 interface SetlistPanelProps {
   stream: Stream | null
@@ -13,9 +14,13 @@ interface SetlistPanelProps {
 export default function SetlistPanel({ stream }: SetlistPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const setlist: SetlistItem[] = Array.isArray(stream?.setlist)
-    ? (stream.setlist as unknown as SetlistItem[])
-    : []
+  // Use the stream's own setlist if it explicitly has one; otherwise fall back
+  // to the default programme (currently the Belgium concert) so every stream,
+  // including test streams, shows it without needing to be seeded.
+  const setlist: SetlistItem[] =
+    Array.isArray(stream?.setlist) && stream.setlist.length > 0
+      ? (stream.setlist as unknown as SetlistItem[])
+      : DEFAULT_SETLIST
 
   if (!setlist || setlist.length === 0) {
     return (

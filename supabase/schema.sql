@@ -195,35 +195,11 @@ ON CONFLICT (email) DO UPDATE SET
   is_banned = false;
 
 -- ============================================================
--- Seed: Belgium Concert setlist
+-- Setlist
 -- ============================================================
--- The setlist is stored on streams.setlist (jsonb) so it is the single source
--- of truth and is editable at runtime via the admin UI or the agent API:
+-- The default programme (currently the Belgium Concert) lives in CODE, not the
+-- DB: lib/default-setlist.ts. Every stream whose streams.setlist is null/empty
+-- renders that default, so test streams need no seeding. To give one stream a
+-- different programme, set its streams.setlist (admin UI or the agent API:
 --   PATCH /api/agent/stream  { "stream_id": "<uuid>", "setlist": [ ... ] }
--- The watch page renders streams.setlist; the in-code DEMO_SETLIST is only a
--- placeholder fallback for streams that have no setlist yet.
---
--- Belgium Concert · Theaterzaal Maupertuis, CC De Factorij, Zaventem · 11 Jun 2026.
--- This seeds any existing stream that lacks a setlist (incl. the auto-provisioned
--- default). It never overwrites a setlist that has already been set, so it is safe
--- to re-run and will not clobber agent/admin edits.
-UPDATE vip_livestream.streams
-SET setlist = '[
-  {"id":"1","piece":"Prelude in G minor, Op. 23 No. 5","composer":"Sergei Rachmaninoff","composerYears":"1873–1943","performer":"Lionel Yu","duration":"~4 min","notes":"Opener. Solo piano."},
-  {"id":"2","piece":"Colors of the Soul","composer":"Lionel Yu","performer":"Lionel Yu","duration":"~4 min","notes":"Original work for solo piano."},
-  {"id":"3","piece":"Gallop","composer":"Lionel Yu","performer":"Lionel Yu, with violin & cello (trio)","duration":"~5 min","notes":"Trio arrangement."},
-  {"id":"4","piece":"Torrent, Étude Op. 10 No. 4","composer":"Frédéric Chopin","composerYears":"1810–1849","performer":"Lionel Yu","duration":"~2.5 min","notes":"Solo piano."},
-  {"id":"4n","piece":"Torrent Étude (Nightmare)","composer":"after Frédéric Chopin","performer":"Lionel Yu","duration":"~4 min","notes":"''Nightmare'' arrangement — solo piano with electronic backing."},
-  {"id":"5","piece":"Beethoven Virus","composer":"after Ludwig van Beethoven","performer":"Lionel Yu, with violin & cello (trio)","duration":"~4.5 min","notes":"Trio arrangement."},
-  {"id":"6","piece":"Canon in Dream","composer":"after Johann Pachelbel","composerYears":"1653–1706","performer":"Lionel Yu","duration":"~4.5 min","notes":"Electronic arrangement — solo piano with backing track."},
-  {"id":"7","piece":"Fight for Freedom","composer":"Lionel Yu","performer":"Lionel Yu","duration":"~5 min","notes":"Original work for solo piano."},
-  {"id":"8","piece":"Winter Wind, Étude Op. 25 No. 11","composer":"Frédéric Chopin","composerYears":"1810–1849","performer":"Lionel Yu","duration":"~4 min","notes":"Solo piano."},
-  {"id":"9","piece":"Moonlight Sonata","composer":"Ludwig van Beethoven","composerYears":"1770–1827","performer":"Lionel Yu","duration":"~6 min","notes":"''Nightmare'' arrangement — solo piano with electronic backing."},
-  {"id":"10","piece":"Sunflowers","composer":"Lionel Yu","performer":"Lionel Yu","duration":"~5 min","notes":"Original work for solo piano."},
-  {"id":"11","piece":"Dreams of a Violin","composer":"Lionel Yu","performer":"Lionel Yu, with violin (duet)","duration":"~5 min","notes":"Violin and piano duet."},
-  {"id":"12","piece":"Für Elise","composer":"Ludwig van Beethoven","composerYears":"1770–1827","performer":"Lionel Yu","duration":"~5 min","notes":"Dubstep arrangement — solo piano with electronic backing."},
-  {"id":"e1","piece":"Fantaisie-Impromptu","composer":"Frédéric Chopin","composerYears":"1810–1849","performer":"Lionel Yu","duration":"~5 min","notes":"Encore. Op. 66, solo piano."},
-  {"id":"e2","piece":"Flight of the Bumblebee","composer":"Nikolai Rimsky-Korsakov","composerYears":"1844–1908","performer":"Lionel Yu","duration":"~2 min","notes":"Encore. Solo piano."},
-  {"id":"e3","piece":"Still D.R.E.","composer":"after Dr. Dre","performer":"Lionel Yu","duration":"~3.5 min","notes":"Encore. Electronic arrangement — solo piano with backing track."}
-]'::jsonb
-WHERE setlist IS NULL;
+-- A non-empty streams.setlist overrides the code default for that stream only.
