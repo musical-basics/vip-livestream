@@ -44,7 +44,7 @@ export default async function HomePage({
               <span className="text-sm">🎹</span>
             </div>
             <span className="text-sm font-medium tracking-widest uppercase text-muted-foreground">
-              Musical Basics
+              MusicalBasics
             </span>
           </div>
           <h1

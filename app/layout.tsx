@@ -10,7 +10,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'VIP Livestream | Musical Basics',
+  title: 'VIP Livestream | MusicalBasics',
   description: 'Exclusive VIP access to a live piano performance. Stream, chat, and experience music in an intimate virtual setting.',
   robots: 'noindex, nofollow',
 }

@@ -33,7 +33,7 @@ export default function Header({ member, stream }: HeaderProps) {
             className="truncate text-base font-light leading-none text-gold sm:text-lg"
             style={{ fontFamily: "'Cormorant Garamond', serif" }}
           >
-            Musical Basics
+            MusicalBasics
           </h1>
           <p className="text-[10px] text-muted-foreground tracking-widest uppercase leading-none mt-0.5">
             VIP Livestream
