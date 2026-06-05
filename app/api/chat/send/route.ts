@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase-server'
 import { createClient as createBrowserClient } from '@supabase/supabase-js'
+import { canModerateChat } from '@/lib/roles'
 
 const MAX_CONTENT_LENGTH = 500
 const MAX_EMOJI_LENGTH = 32
@@ -45,6 +46,34 @@ export async function POST(request: NextRequest) {
 
   if (timeout) {
     return NextResponse.json({ error: 'You are timed out' }, { status: 403 })
+  }
+
+  // Check for active slow mode delay
+  const { data: stream } = await supabase
+    .from('streams')
+    .select('slow_mode_delay')
+    .eq('id', stream_id)
+    .single()
+
+  const slowModeDelay = stream?.slow_mode_delay || 0
+
+  if (slowModeDelay > 0 && !canModerateChat(member)) {
+    const slowModeSince = new Date(Date.now() - slowModeDelay * 1000).toISOString()
+    const { data: lastMessage } = await supabase
+      .from('chat_messages')
+      .select('created_at')
+      .eq('member_id', member.id)
+      .eq('stream_id', stream_id)
+      .gte('created_at', slowModeSince)
+      .limit(1)
+      .maybeSingle()
+
+    if (lastMessage) {
+      return NextResponse.json(
+        { error: `Slow mode is active. You must wait ${slowModeDelay} seconds between messages.` },
+        { status: 429 }
+      )
+    }
   }
 
   const rateLimitSince = new Date(Date.now() - RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString()

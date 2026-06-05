@@ -58,6 +58,7 @@ export interface Database {
           description: string | null
           created_at: string
           pinned_message: Json | null
+          slow_mode_delay: number
         }
         Insert: {
           id?: string
@@ -69,6 +70,7 @@ export interface Database {
           description?: string | null
           created_at?: string
           pinned_message?: Json | null
+          slow_mode_delay?: number
         }
         Update: {
           id?: string
@@ -80,6 +82,7 @@ export interface Database {
           description?: string | null
           created_at?: string
           pinned_message?: Json | null
+          slow_mode_delay?: number
         }
       }
       chat_messages: {

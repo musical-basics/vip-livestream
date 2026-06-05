@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS vip_livestream.streams (
   is_live boolean NOT NULL DEFAULT false,
   setlist jsonb,
   description text,
+  slow_mode_delay integer NOT NULL DEFAULT 0,
+  pinned_message jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -94,6 +96,8 @@ CREATE TABLE IF NOT EXISTS vip_livestream.chat_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_stream_id_created ON vip_livestream.chat_messages(stream_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_member_stream_created ON vip_livestream.chat_messages(member_id, stream_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_unmuted_stream_created ON vip_livestream.chat_messages(stream_id, created_at DESC) WHERE is_muted = false;
 
 -- 4. Member timeouts table
 CREATE TABLE IF NOT EXISTS vip_livestream.member_timeouts (

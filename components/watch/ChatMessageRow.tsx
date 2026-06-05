@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { memo, useState, useEffect } from 'react'
 import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
-import { canModerateChat } from '@/lib/roles'
+import { canModerateChat, ROLE_BADGE } from '@/lib/roles'
 import { formatDistanceToNow } from 'date-fns'
 import { MoreHorizontal, Trash2, Clock, Smile, Pin } from 'lucide-react'
 import {
@@ -45,7 +45,7 @@ function getMemberColor(memberId: string): string {
   return colors[hash % colors.length]
 }
 
-export default function ChatMessageRow({
+function ChatMessageRow({
   message,
   currentMember,
   senderBadges,
@@ -482,3 +482,5 @@ function ModMenu({
     </div>
   )
 }
+
+export default memo(ChatMessageRow)

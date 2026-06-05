@@ -5,19 +5,19 @@ export const MEMBER_BADGES = [
     id: 'vip_member',
     label: 'VIP Member',
     emoji: '💛',
-    className: 'border-[oklch(0.75_0.12_85)/35] text-[oklch(0.78_0.13_85)] bg-[oklch(0.75_0.12_85)/10]',
+    className: 'border-[oklch(0.82_0.16_90)/50] text-[oklch(0.85_0.16_90)] bg-[oklch(0.82_0.16_90)/15]',
   },
   {
     id: 'private_student',
     label: 'Private Student',
     emoji: '🎹',
-    className: 'border-[oklch(0.68_0.14_160)/35] text-[oklch(0.76_0.12_160)] bg-[oklch(0.68_0.14_160)/10]',
+    className: 'border-[oklch(0.76_0.17_165)/50] text-[oklch(0.80_0.16_165)] bg-[oklch(0.76_0.17_165)/15]',
   },
   {
     id: 'dreamplay_buyer',
     label: 'DreamPlay Buyer',
     emoji: '✨',
-    className: 'border-[oklch(0.70_0.15_300)/35] text-[oklch(0.78_0.13_300)] bg-[oklch(0.70_0.15_300)/10]',
+    className: 'border-[oklch(0.72_0.20_310)/50] text-[oklch(0.80_0.18_310)] bg-[oklch(0.72_0.20_310)/15]',
   },
 ] as const
 

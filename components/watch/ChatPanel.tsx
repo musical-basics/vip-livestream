@@ -56,10 +56,25 @@ export default function ChatPanel({
   const [pinnedMessage, setPinnedMessage] = useState<ChatMessage | null>(
     () => (stream?.pinned_message as unknown as ChatMessage) || null
   )
+  const [slowModeDelay, setSlowModeDelay] = useState(stream?.slow_mode_delay || 0)
+  const [isUpdatingSlowMode, setIsUpdatingSlowMode] = useState(false)
+  const [cooldownRemaining, setCooldownRemaining] = useState(0)
 
   useEffect(() => {
     setPinnedMessage((stream?.pinned_message as unknown as ChatMessage) || null)
   }, [stream?.pinned_message])
+
+  useEffect(() => {
+    setSlowModeDelay(stream?.slow_mode_delay || 0)
+  }, [stream?.slow_mode_delay])
+
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return
+    const timer = setTimeout(() => {
+      setCooldownRemaining((prev) => prev - 1)
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [cooldownRemaining])
 
   const spawnEmojiBurst = useCallback((emoji: string, count = 6) => {
     setChatFloatingEmojis((prev) => {
@@ -184,6 +199,10 @@ export default function ChatPanel({
         const { pinned_message } = payload as { pinned_message: ChatMessage | null }
         setPinnedMessage(pinned_message)
       })
+      .on('broadcast', { event: 'slow_mode_updated' }, ({ payload }) => {
+        const { slow_mode_delay } = payload as { slow_mode_delay: number }
+        setSlowModeDelay(slow_mode_delay)
+      })
       .on('broadcast', { event: 'tip_received' }, ({ payload }) => {
         onTipBanner(payload as { name: string; amount: number; message?: string })
       })
@@ -276,11 +295,36 @@ export default function ChatPanel({
       if (data.message) {
         shouldAutoScrollRef.current = true
         setMessages((prev) => appendMessage(prev, data.message))
+        if (slowModeDelay > 0 && !canModerateChat(member)) {
+          setCooldownRemaining(slowModeDelay)
+        }
       }
     } finally {
       setIsSending(false)
     }
-  }, [displayName, input, isMuted, isSending, stream?.id])
+  }, [displayName, input, isMuted, isSending, stream?.id, slowModeDelay, member])
+
+  const updateSlowMode = useCallback(async (delay: number) => {
+    if (!stream?.id || isUpdatingSlowMode) return
+    setIsUpdatingSlowMode(true)
+    try {
+      const res = await fetch('/api/mod/slow-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stream_id: stream.id,
+          slow_mode_delay: delay,
+        }),
+      })
+      if (!res.ok) {
+        console.error('Failed to update slow mode')
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsUpdatingSlowMode(false)
+    }
+  }, [stream?.id, isUpdatingSlowMode])
 
   function handleEmojiSelect(emoji: string) {
     setShowEmojiPicker(false)
@@ -301,6 +345,29 @@ export default function ChatPanel({
       setApplauseCooldown(false)
     }, 1000)
   }, [stream?.id, applauseCooldown, onEmojiReaction, sendMessage, spawnEmojiBurst])
+
+  const handleMessageDeleted = useCallback((messageId: string) => {
+    setMessages((prev) => prev.filter((message) => message.id !== messageId))
+  }, [])
+
+  const handleMessageReacted = useCallback((messageId: string, reactions: Record<string, string[]>) => {
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id === messageId) {
+          const prevReactions = msg.reactions || {}
+          Object.keys(reactions).forEach((emoji) => {
+            const prevCount = prevReactions[emoji]?.length || 0
+            const nextCount = reactions[emoji]?.length || 0
+            if (nextCount > prevCount) {
+              spawnEmojiBurst(emoji, 6)
+            }
+          })
+          return { ...msg, reactions }
+        }
+        return msg
+      })
+    )
+  }, [spawnEmojiBurst])
 
   const handlePinToggle = useCallback(async (msg: ChatMessage) => {
     if (!stream?.id) return
@@ -330,6 +397,7 @@ export default function ChatPanel({
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
+      if (cooldownRemaining > 0 && !canModerateChat(member)) return
       sendMessage()
     }
   }
@@ -343,9 +411,29 @@ export default function ChatPanel({
           displayName={displayName}
           onChange={setDisplayName}
         />
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Users className="w-3 h-3" />
-          <span>{onlineCount}</span>
+        <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+          {canModerateChat(member) && (
+            <div className="flex items-center gap-1.5 bg-white/5 border border-white/8 rounded-lg px-2 py-0.5 text-xs text-muted-foreground focus-within:ring-1 focus-within:ring-gold/50">
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-gold/80">Slow</span>
+              <select
+                value={slowModeDelay}
+                onChange={(e) => updateSlowMode(Number(e.target.value))}
+                disabled={isUpdatingSlowMode}
+                className="bg-transparent text-foreground font-medium outline-none cursor-pointer border-none p-0 pr-1 text-xs"
+              >
+                <option value={0} className="bg-popover text-foreground">Off</option>
+                <option value={3} className="bg-popover text-foreground">3s</option>
+                <option value={5} className="bg-popover text-foreground">5s</option>
+                <option value={10} className="bg-popover text-foreground">10s</option>
+                <option value={30} className="bg-popover text-foreground">30s</option>
+                <option value={60} className="bg-popover text-foreground">60s</option>
+              </select>
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            <Users className="w-3 h-3" />
+            <span>{onlineCount}</span>
+          </div>
         </div>
       </div>
 
@@ -415,29 +503,10 @@ export default function ChatPanel({
                 senderRole={roleLabel(sender)}
                 isMuted={mutedMessageIds.has(msg.id)}
                 streamId={stream?.id}
-                onDeleted={(messageId) =>
-                  setMessages((prev) => prev.filter((message) => message.id !== messageId))
-                }
+                onDeleted={handleMessageDeleted}
                 isPinned={pinnedMessage?.id === msg.id}
                 onPinToggle={handlePinToggle}
-                onReacted={(messageId, reactions) => {
-                  setMessages((prev) =>
-                    prev.map((msg) => {
-                      if (msg.id === messageId) {
-                        const prevReactions = msg.reactions || {}
-                        Object.keys(reactions).forEach((emoji) => {
-                          const prevCount = prevReactions[emoji]?.length || 0
-                          const nextCount = reactions[emoji]?.length || 0
-                          if (nextCount > prevCount) {
-                            spawnEmojiBurst(emoji, 6)
-                          }
-                        })
-                        return { ...msg, reactions }
-                      }
-                      return msg
-                    })
-                  )
-                }}
+                onReacted={handleMessageReacted}
               />
             )
           })()
@@ -460,51 +529,66 @@ export default function ChatPanel({
             </p>
           </div>
         ) : (
-          <div className="flex items-end gap-2">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Say something…"
-              disabled={!stream?.id}
-              rows={1}
-              maxLength={500}
-              className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/8 bg-white/5 px-3 py-2.5 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm max-h-[100px] overflow-y-auto"
-              style={textareaAutoSizeStyle}
-            />
-             <button
-              onClick={handleApplauseClick}
-              disabled={!stream?.id || applauseCooldown}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-amber-400 hover:text-amber-300 transition-all hover:scale-105 active:scale-95 duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Applause reaction (👏)"
-            >
-              <span className={`text-lg transition-transform ${applauseCooldown ? 'scale-75 opacity-50' : ''}`}>👏</span>
-            </button>
-            <button
-              onClick={() => setShowEmojiPicker((v) => !v)}
-              disabled={!stream?.id}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
-              title="Emoji reactions"
-            >
-              <Smile className="w-4 h-4" />
-            </button>
-            <Button
-              onClick={() => sendMessage()}
-              disabled={isSending || !input.trim() || !stream?.id}
-              size="sm"
-              className="h-11 shrink-0 rounded-xl px-3"
-              style={{
-                background: input.trim()
-                  ? 'linear-gradient(135deg, oklch(0.75 0.12 85), oklch(0.60 0.10 70))'
-                  : undefined,
-              }}
-            >
-              {isSending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
+          <div className="space-y-2">
+            {slowModeDelay > 0 && (
+              <div className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
+                <span className="text-gold/90 font-medium">🐢 Slow Mode:</span>
+                <span>One message every {slowModeDelay}s</span>
+                {canModerateChat(member) ? (
+                  <span className="text-gold/60 font-semibold ml-1.5">(Exempt)</span>
+                ) : cooldownRemaining > 0 ? (
+                  <span className="ml-auto text-gold font-semibold animate-pulse">Wait {cooldownRemaining}s</span>
+                ) : null}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Say something…"
+                disabled={!stream?.id}
+                rows={1}
+                maxLength={500}
+                className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/8 bg-white/5 px-3 py-2.5 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[oklch(0.75_0.12_85)] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm max-h-[100px] overflow-y-auto"
+                style={textareaAutoSizeStyle}
+              />
+              <button
+                onClick={handleApplauseClick}
+                disabled={!stream?.id || applauseCooldown || (cooldownRemaining > 0 && !canModerateChat(member))}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-amber-400 hover:text-amber-300 transition-all hover:scale-105 active:scale-95 duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Applause reaction (👏)"
+              >
+                <span className={`text-lg transition-transform ${applauseCooldown || (cooldownRemaining > 0 && !canModerateChat(member)) ? 'scale-75 opacity-50' : ''}`}>👏</span>
+              </button>
+              <button
+                onClick={() => setShowEmojiPicker((v) => !v)}
+                disabled={!stream?.id}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+                title="Emoji reactions"
+              >
+                <Smile className="w-4 h-4" />
+              </button>
+              <Button
+                onClick={() => sendMessage()}
+                disabled={isSending || !input.trim() || !stream?.id || (cooldownRemaining > 0 && !canModerateChat(member))}
+                size="sm"
+                className="h-11 shrink-0 rounded-xl px-3"
+                style={{
+                  background: input.trim() && !(cooldownRemaining > 0 && !canModerateChat(member))
+                    ? 'linear-gradient(135deg, oklch(0.75 0.12 85), oklch(0.60 0.10 70))'
+                    : undefined,
+                }}
+              >
+                {isSending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : cooldownRemaining > 0 && !canModerateChat(member) ? (
+                  <span className="text-xs font-bold">{cooldownRemaining}s</span>
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
           </div>
         )}
       </div>
