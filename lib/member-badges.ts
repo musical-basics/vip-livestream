@@ -5,18 +5,22 @@ export const MEMBER_BADGES = [
     id: 'vip_member',
     label: 'VIP Member',
     emoji: '💛',
+    // `color` is the standalone display colour (used for chat names); className is the badge pill.
+    color: 'oklch(0.85 0.16 90)',
     className: 'border-[oklch(0.82_0.16_90)/50] text-[oklch(0.85_0.16_90)] bg-[oklch(0.82_0.16_90)/15]',
   },
   {
     id: 'private_student',
     label: 'Private Student',
     emoji: '🎹',
+    color: 'oklch(0.80 0.16 165)',
     className: 'border-[oklch(0.76_0.17_165)/50] text-[oklch(0.80_0.16_165)] bg-[oklch(0.76_0.17_165)/15]',
   },
   {
     id: 'dreamplay_buyer',
     label: 'DreamPlay Buyer',
     emoji: '✨',
+    color: 'oklch(0.80 0.18 310)',
     className: 'border-[oklch(0.72_0.20_310)/50] text-[oklch(0.80_0.18_310)] bg-[oklch(0.72_0.20_310)/15]',
   },
 ] as const

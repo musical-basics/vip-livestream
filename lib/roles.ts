@@ -1,4 +1,5 @@
 import type { Member } from '@/lib/database.types'
+import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
 
 /**
  * Two-tier roles:
@@ -38,15 +39,17 @@ export type RoleName = 'ADMIN' | 'MOD'
  * to tell apart at a glance: ADMIN = crimson with a crown, MOD = blue with a
  * shield. Member access badges have their own colours in lib/member-badges.ts.
  */
-export const ROLE_BADGE: Record<RoleName, { label: string; emoji: string; className: string }> = {
+export const ROLE_BADGE: Record<RoleName, { label: string; emoji: string; color: string; className: string }> = {
   ADMIN: {
     label: 'ADMIN',
     emoji: '👑',
+    color: 'oklch(0.78 0.19 25)',
     className: 'border-[oklch(0.7_0.2_25)/55] text-[oklch(0.78_0.19_25)] bg-[oklch(0.7_0.2_25)/15]',
   },
   MOD: {
     label: 'MOD',
     emoji: '🛡️',
+    color: 'oklch(0.78 0.15 250)',
     className: 'border-[oklch(0.7_0.16_250)/55] text-[oklch(0.78_0.15_250)] bg-[oklch(0.7_0.16_250)/15]',
   },
 }
@@ -55,4 +58,16 @@ export const ROLE_BADGE: Record<RoleName, { label: string; emoji: string; classN
 export function roleBadge(member: RoleFlags | null | undefined) {
   const label = roleLabel(member)
   return label ? ROLE_BADGE[label] : null
+}
+
+/**
+ * Display colour for a person's chat name. Role wins (admin = crimson,
+ * mod = blue); otherwise it matches their primary access badge (VIP gold,
+ * private student emerald, DreamPlay violet). So a name always reinforces the
+ * badge shown beside it.
+ */
+export function nameColor(role: RoleName | null, accessBadges: unknown): string {
+  if (role) return ROLE_BADGE[role].color
+  const primary = getMemberBadge(normalizeMemberBadges(accessBadges)[0])
+  return primary?.color ?? 'oklch(0.85 0.16 90)'
 }

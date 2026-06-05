@@ -85,7 +85,12 @@ export default function ConcertAnnouncementDialog({
 
           <div className="flex gap-3 text-sm text-muted-foreground">
             <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[oklch(0.75_0.12_85)]" />
-            <p>In the meantime, chat is open so you can say hello while you wait.</p>
+            <div>
+              <p>In the meantime, chat is open so you can say hello while you wait.</p>
+              <p className="mt-2 text-xs text-gold/85 font-medium leading-normal">
+                💡 Tip: Feel free to change your exposed name at the top of the chat panel if you want!
+              </p>
+            </div>
           </div>
         </div>
 

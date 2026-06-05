@@ -3,7 +3,7 @@
 import { memo, useState } from 'react'
 import type { Member, ChatMessage } from '@/lib/database.types'
 import { getMemberBadge, normalizeMemberBadges } from '@/lib/member-badges'
-import { canModerateChat, ROLE_BADGE } from '@/lib/roles'
+import { canModerateChat, nameColor, ROLE_BADGE } from '@/lib/roles'
 import { formatDistanceToNow } from 'date-fns'
 import { MoreHorizontal, Trash2, Clock, Smile, Pin } from 'lucide-react'
 import {
