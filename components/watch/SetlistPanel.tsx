@@ -10,18 +10,25 @@ import { CATEGORY_META } from '@/lib/setlist-category'
 
 interface SetlistPanelProps {
   stream: Stream | null
+  /**
+   * Global fallback programme resolved server-side (the stored 'programme'
+   * document, else the code default). Used when the stream has no own setlist.
+   */
+  programme?: SetlistItem[]
 }
 
-export default function SetlistPanel({ stream }: SetlistPanelProps) {
+export default function SetlistPanel({ stream, programme }: SetlistPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   // Use the stream's own setlist if it explicitly has one; otherwise fall back
-  // to the default programme (currently the Belgium concert) so every stream,
-  // including test streams, shows it without needing to be seeded.
+  // to the global programme (the stored/default Belgium concert) so every
+  // stream, including test streams, shows it without needing to be seeded.
   const setlist: SetlistItem[] =
     Array.isArray(stream?.setlist) && stream.setlist.length > 0
       ? (stream.setlist as unknown as SetlistItem[])
-      : DEFAULT_SETLIST
+      : programme && programme.length > 0
+        ? programme
+        : DEFAULT_SETLIST
 
   if (!setlist || setlist.length === 0) {
     return (

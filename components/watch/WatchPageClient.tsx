@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, type PointerEvent as ReactPointerEvent } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
-import type { Member, Stream, ChatMessage, Comment } from '@/lib/database.types'
+import type { Member, Stream, ChatMessage, Comment, SetlistItem } from '@/lib/database.types'
 import VideoPlayer from './VideoPlayer'
 import ChatPanel from './ChatPanel'
 import SetlistPanel from './SetlistPanel'
@@ -32,6 +32,8 @@ interface WatchPageClientProps {
   initialComments: Comment[]
   memberDirectory: Member[]
   isMuted: boolean
+  /** Global fallback programme (stored or code default) when the stream has no own setlist. */
+  programme?: SetlistItem[]
 }
 
 // ── Drag handle components ────────────────────────────────────
@@ -99,6 +101,7 @@ export default function WatchPageClient({
   initialComments,
   memberDirectory,
   isMuted,
+  programme,
 }: WatchPageClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -388,7 +391,7 @@ export default function WatchPageClient({
               </TabsList>
 
               <TabsContent value="setlist">
-                <SetlistPanel stream={stream} />
+                <SetlistPanel stream={stream} programme={programme} />
               </TabsContent>
 
               <TabsContent value="comments">

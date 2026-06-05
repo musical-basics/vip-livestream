@@ -26,6 +26,12 @@ export async function GET(request: NextRequest) {
         'PATCH /api/agent/stream': 'Update a stream. Body: { stream_id, is_live?, youtube_video_id?, title?, description?, setlist?, stream_start_utc? }. youtube_video_id accepts a YouTube URL or raw video ID.',
         'DELETE /api/agent/stream': 'Delete a stream. Body: { stream_id }',
       },
+      setlist: {
+        'GET /api/agent/setlist':    "List stored setlist documents, or one with ?slug=. Slugs: 'programme' (viewer programme on /watch), 'belgium-tracker' (full production tracker on /setlist).",
+        'PUT /api/agent/setlist':    "Create or overwrite a setlist document. Body: { slug, data }. For slug 'programme', data is a SetlistItem[] (each: { id, piece, composer, performer, composerYears?, duration?, notes?, category? } where category is 'solo'|'edm'|'trio'|'duet'). For slug 'belgium-tracker', data is the full tracker object.",
+        'PATCH /api/agent/setlist':  'Alias for PUT (full-document upsert).',
+        'DELETE /api/agent/setlist': 'Remove a stored document so the slug reverts to its code default. Body: { slug } (or ?slug=).',
+      },
       members: {
         'GET /api/agent/members':    'List all members. Query: ?moderators_only=true|false, ?banned=true|false',
         'POST /api/agent/members':   'Add a new member. Body: { name, email, is_moderator?, display_name?, access_badges? }. Badge IDs: vip_member, private_student, dreamplay_buyer.',

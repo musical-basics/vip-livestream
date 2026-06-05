@@ -3,20 +3,8 @@ import { redirect } from 'next/navigation'
 import { ArrowLeft, Music2, Clock3, KeyRound, ListChecks, CircleHelp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { getSession } from '@/lib/auth'
-import {
-  CONCERT_HEADER,
-  SETLIST_COLUMNS,
-  MAIN_PROGRAM,
-  ENCORES,
-  BENCH,
-  BENCH_HEADING,
-  MAIN_MUSIC_TOTAL_MIN,
-  TIMING,
-  COLOR_KEY,
-  WORKFLOW,
-  OPEN_DECISIONS,
-  type SetlistRow,
-} from '@/lib/belgium-setlist'
+import { SETLIST_COLUMNS, type SetlistRow } from '@/lib/belgium-setlist'
+import { getBelgiumTracker } from '@/lib/setlist-store'
 
 export const metadata = {
   title: 'Belgium Concert Setlist',
@@ -112,6 +100,20 @@ export default async function SetlistPage() {
   if (!member) redirect('/')
   if (!member.is_moderator) redirect('/watch')
 
+  const tracker = await getBelgiumTracker()
+  const {
+    header,
+    mainProgram,
+    mainMusicTotalMin,
+    encores,
+    benchHeading,
+    bench,
+    timing,
+    colorKey,
+    workflow,
+    openDecisions,
+  } = tracker
+
   return (
     <main className="min-h-[100dvh]">
       <header className="glass-heavy flex flex-wrap items-center gap-3 border-b border-border/50 px-4 py-4 sm:px-6">
@@ -137,43 +139,43 @@ export default async function SetlistPage() {
         {/* Concert header */}
         <section>
           <p className="text-sm uppercase tracking-widest text-muted-foreground">
-            {CONCERT_HEADER.tracker}
+            {header.tracker}
           </p>
-          <p className="mt-1 text-foreground/90">{CONCERT_HEADER.when}</p>
-          <p className="text-sm text-muted-foreground">{CONCERT_HEADER.venue}</p>
+          <p className="mt-1 text-foreground/90">{header.when}</p>
+          <p className="text-sm text-muted-foreground">{header.venue}</p>
         </section>
 
         {/* Main program */}
         <section>
           <SectionTitle icon={<Music2 className="h-4 w-4" />}>Main program</SectionTitle>
-          <SetlistTable rows={MAIN_PROGRAM} />
+          <SetlistTable rows={mainProgram} />
           <p className="mt-2 text-xs text-muted-foreground">
-            Music total, all listed (main): {MAIN_MUSIC_TOTAL_MIN} min.
+            Music total, all listed (main): {mainMusicTotalMin} min.
           </p>
         </section>
 
         {/* Encores */}
         <section>
           <SectionTitle icon={<Music2 className="h-4 w-4" />}>Encores</SectionTitle>
-          <SetlistTable rows={ENCORES} />
+          <SetlistTable rows={encores} />
         </section>
 
         {/* Bench / candidates */}
         <section>
           <SectionTitle icon={<Music2 className="h-4 w-4" />}>Bench / candidates</SectionTitle>
-          <p className="mb-3 text-sm text-muted-foreground">{BENCH_HEADING}</p>
-          <SetlistTable rows={BENCH} />
+          <p className="mb-3 text-sm text-muted-foreground">{benchHeading}</p>
+          <SetlistTable rows={bench} />
         </section>
 
         {/* Timing */}
         <section>
-          <SectionTitle icon={<Clock3 className="h-4 w-4" />}>{TIMING.title}</SectionTitle>
-          <p className="mb-3 text-sm text-muted-foreground">{TIMING.target}</p>
+          <SectionTitle icon={<Clock3 className="h-4 w-4" />}>{timing.title}</SectionTitle>
+          <p className="mb-3 text-sm text-muted-foreground">{timing.target}</p>
           <div className="glass overflow-x-auto rounded-2xl">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left">
-                  {TIMING.columns.map((col) => (
+                  {timing.columns.map((col) => (
                     <th
                       key={col}
                       className="px-3 py-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground"
@@ -184,7 +186,7 @@ export default async function SetlistPage() {
                 </tr>
               </thead>
               <tbody>
-                {TIMING.rows.map((row) => (
+                {timing.rows.map((row) => (
                   <tr key={row.component} className="border-b border-white/5 align-top">
                     <td className="px-3 py-3 text-foreground/80">{row.component}</td>
                     <td className="px-3 py-3 text-foreground/80">{row.low}</td>
@@ -193,12 +195,12 @@ export default async function SetlistPage() {
                   </tr>
                 ))}
                 <tr className="border-b border-white/10 bg-white/3 align-top font-medium">
-                  <td className="px-3 py-3 text-foreground">{TIMING.mainTotal.component}</td>
-                  <td className="px-3 py-3 text-foreground">{TIMING.mainTotal.low}</td>
-                  <td className="px-3 py-3 text-foreground">{TIMING.mainTotal.high}</td>
-                  <td className="px-3 py-3 text-sm text-muted-foreground">{TIMING.mainTotal.notes}</td>
+                  <td className="px-3 py-3 text-foreground">{timing.mainTotal.component}</td>
+                  <td className="px-3 py-3 text-foreground">{timing.mainTotal.low}</td>
+                  <td className="px-3 py-3 text-foreground">{timing.mainTotal.high}</td>
+                  <td className="px-3 py-3 text-sm text-muted-foreground">{timing.mainTotal.notes}</td>
                 </tr>
-                {TIMING.encoreRows.map((row) => (
+                {timing.encoreRows.map((row) => (
                   <tr key={row.component} className="border-b border-white/5 align-top">
                     <td className="px-3 py-3 text-foreground/80">{row.component}</td>
                     <td className="px-3 py-3 text-foreground/80">{row.low}</td>
@@ -207,11 +209,11 @@ export default async function SetlistPage() {
                   </tr>
                 ))}
                 <tr className="align-top font-medium">
-                  <td className="px-3 py-3 text-[oklch(0.82_0.14_45)]">{TIMING.fullTotal.component}</td>
-                  <td className="px-3 py-3 text-[oklch(0.82_0.14_45)]">{TIMING.fullTotal.low}</td>
-                  <td className="px-3 py-3 text-[oklch(0.82_0.14_45)]">{TIMING.fullTotal.high}</td>
+                  <td className="px-3 py-3 text-[oklch(0.82_0.14_45)]">{timing.fullTotal.component}</td>
+                  <td className="px-3 py-3 text-[oklch(0.82_0.14_45)]">{timing.fullTotal.low}</td>
+                  <td className="px-3 py-3 text-[oklch(0.82_0.14_45)]">{timing.fullTotal.high}</td>
                   <td className="px-3 py-3 text-sm text-[oklch(0.82_0.14_45)]">
-                    {TIMING.fullTotal.notes}
+                    {timing.fullTotal.notes}
                   </td>
                 </tr>
               </tbody>
@@ -222,7 +224,7 @@ export default async function SetlistPage() {
               Verdict
             </p>
             <ul className="space-y-1.5 text-sm text-muted-foreground">
-              {TIMING.verdict.map((line) => (
+              {timing.verdict.map((line) => (
                 <li key={line} className="flex gap-2">
                   <span className="text-[oklch(0.75_0.12_85)]">-</span>
                   <span>{line}</span>
@@ -236,7 +238,7 @@ export default async function SetlistPage() {
         <section>
           <SectionTitle icon={<KeyRound className="h-4 w-4" />}>Color key</SectionTitle>
           <div className="glass grid gap-3 rounded-2xl p-4 sm:grid-cols-2">
-            {COLOR_KEY.map((item) => (
+            {colorKey.map((item) => (
               <div key={item.key} className="text-sm">
                 <span className="font-medium text-foreground">{item.key}: </span>
                 <span className="text-muted-foreground">{item.meaning}</span>
@@ -249,7 +251,7 @@ export default async function SetlistPage() {
         <section>
           <SectionTitle icon={<ListChecks className="h-4 w-4" />}>Workflow</SectionTitle>
           <ol className="glass space-y-3 rounded-2xl p-4">
-            {WORKFLOW.map((item) => (
+            {workflow.map((item) => (
               <li key={item.step} className="flex gap-3 text-sm">
                 <span className="shrink-0 font-mono text-xs text-[oklch(0.78_0.13_85)]">
                   {item.step}
@@ -264,7 +266,7 @@ export default async function SetlistPage() {
         <section>
           <SectionTitle icon={<CircleHelp className="h-4 w-4" />}>Open decisions</SectionTitle>
           <div className="glass space-y-3 rounded-2xl p-4">
-            {OPEN_DECISIONS.map((item) => (
+            {openDecisions.map((item) => (
               <div key={item.topic} className="text-sm">
                 <p className="font-medium text-foreground">{item.topic}</p>
                 <p className="text-muted-foreground">{item.detail}</p>

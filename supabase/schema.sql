@@ -125,6 +125,20 @@ CREATE TABLE IF NOT EXISTS vip_livestream.tips (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- 7. Setlists table (named, API-editable programmes / trackers)
+-- Each row is one JSON document addressed by a stable slug, e.g.
+--   'programme'        -> SetlistItem[] for the viewer programme on /watch
+--   'belgium-tracker'  -> the full Belgium production tracker on /setlist
+-- Both fall back to the code defaults (lib/default-setlist.ts,
+-- lib/belgium-setlist.ts) when no row exists, so seeding is optional.
+CREATE TABLE IF NOT EXISTS vip_livestream.setlists (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug text UNIQUE NOT NULL,
+  data jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ============================================================
 -- Row Level Security (RLS)
 -- ============================================================
@@ -136,6 +150,7 @@ ALTER TABLE vip_livestream.chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vip_livestream.member_timeouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vip_livestream.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vip_livestream.tips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vip_livestream.setlists ENABLE ROW LEVEL SECURITY;
 
 -- Grant all permissions on existing tables (just in case they already existed)
 GRANT ALL ON ALL TABLES IN SCHEMA vip_livestream TO anon, authenticated, service_role;
@@ -162,6 +177,9 @@ CREATE POLICY "Service role full access on comments" ON vip_livestream.comments
   FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Service role full access on tips" ON vip_livestream.tips
+  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service role full access on setlists" ON vip_livestream.setlists
   FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
@@ -197,9 +215,18 @@ ON CONFLICT (email) DO UPDATE SET
 -- ============================================================
 -- Setlist
 -- ============================================================
--- The default programme (currently the Belgium Concert) lives in CODE, not the
--- DB: lib/default-setlist.ts. Every stream whose streams.setlist is null/empty
--- renders that default, so test streams need no seeding. To give one stream a
--- different programme, set its streams.setlist (admin UI or the agent API:
+-- Resolution order for the viewer programme on /watch:
+--   1. streams.setlist for the live stream, if non-empty (per-stream override)
+--   2. vip_livestream.setlists row with slug 'programme', if present (global)
+--   3. the code default in lib/default-setlist.ts
+-- The full Belgium tracker on /setlist resolves to:
+--   1. vip_livestream.setlists row with slug 'belgium-tracker', if present
+--   2. the code default in lib/belgium-setlist.ts
+--
+-- Editing setlists via the agent API (Bearer AGENT_API_KEY):
+--   GET    /api/agent/setlist                         -> list all stored rows
+--   GET    /api/agent/setlist?slug=programme          -> one row (data + meta)
+--   PUT    /api/agent/setlist  { slug, data }         -> upsert the JSON document
+--   DELETE /api/agent/setlist  { slug }               -> revert to the code default
+-- One stream's programme can still be overridden with:
 --   PATCH /api/agent/stream  { "stream_id": "<uuid>", "setlist": [ ... ] }
--- A non-empty streams.setlist overrides the code default for that stream only.

@@ -192,6 +192,29 @@ export interface Database {
           created_at?: string
         }
       }
+      setlists: {
+        Row: {
+          id: string
+          slug: string
+          data: Json
+          updated_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          data: Json
+          updated_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          data?: Json
+          updated_at?: string
+          created_at?: string
+        }
+      }
     }
     Views: {}
     Functions: {}
@@ -206,6 +229,7 @@ export type ChatMessage = Database['vip_livestream']['Tables']['chat_messages'][
 export type MemberTimeout = Database['vip_livestream']['Tables']['member_timeouts']['Row']
 export type Comment = Database['vip_livestream']['Tables']['comments']['Row']
 export type Tip = Database['vip_livestream']['Tables']['tips']['Row']
+export type SetlistRecord = Database['vip_livestream']['Tables']['setlists']['Row']
 
 /**
  * Arrangement category for a setlist piece, surfaced as a badge on the
