@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS vip_livestream.members (
   is_admin boolean NOT NULL DEFAULT false,
   is_banned boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
+  -- When the member was emailed their login credentials (null = never sent).
+  credentials_sent_at timestamptz,
   CONSTRAINT members_access_badges_not_empty CHECK (coalesce(array_length(access_badges, 1), 0) > 0),
   CONSTRAINT members_access_badges_valid CHECK (
     access_badges <@ ARRAY['vip_member', 'private_student', 'dreamplay_buyer']::text[]
@@ -39,6 +41,10 @@ ALTER TABLE vip_livestream.members
 -- Roles: is_admin (full access, can assign mods) vs is_moderator (chat moderation only).
 ALTER TABLE vip_livestream.members
   ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false;
+
+-- Credential delivery tracking (Shopify webhook auto-send + --unsent-only backfill).
+ALTER TABLE vip_livestream.members
+  ADD COLUMN IF NOT EXISTS credentials_sent_at timestamptz;
 
 UPDATE vip_livestream.members
 SET access_badges = ARRAY['vip_member']::text[]

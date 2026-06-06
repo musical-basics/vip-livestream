@@ -1,5 +1,7 @@
-import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createServiceClient } from '@/lib/supabase-server'
+import { makePassword } from '@/lib/livestream-email'
+import type { DeliverableMember } from '@/lib/credential-delivery'
 
 /**
  * The Belgium Concert Livestream product variant (see the belgium-concert repo
@@ -56,18 +58,33 @@ export function isLivestreamOrder(order: ShopifyOrder): boolean {
 }
 
 export type ProvisionResult =
-  | { status: 'created'; email: string; password_token: string }
-  | { status: 'exists'; email: string; password_token: string }
+  | { status: 'created'; member: DeliverableMember }
+  | { status: 'exists'; member: DeliverableMember }
   | { status: 'skipped'; reason: string }
 
 function isMissingAccessBadgesColumn(error: { code?: string; message?: string }) {
   return error.code === 'PGRST204' || error.message?.includes('access_badges')
 }
 
+/** Columns needed to decide whether to email + how. `select('*')` so this works
+ * whether or not credentials_sent_at has been migrated yet. */
+function toDeliverable(row: Record<string, unknown>): DeliverableMember {
+  return {
+    id: String(row.id),
+    name: String(row.name ?? ''),
+    email: String(row.email ?? ''),
+    password_token: (row.password_token as string | null) ?? null,
+    credentials_sent_at: (row.credentials_sent_at as string | null | undefined),
+  }
+}
+
 /**
  * Idempotently provision a member from a livestream order. If a member with the
  * same email already exists, their assigned password is preserved, so already
  * emailed credentials keep working. We never regenerate on a webhook re-fire.
+ *
+ * A brand-new member is given a typable 6-letter password so the credential
+ * email (sent by the route) shows something a human can enter by hand.
  */
 export async function provisionLivestreamMember(order: ShopifyOrder): Promise<ProvisionResult> {
   const c = order.customer ?? {}
@@ -79,20 +96,19 @@ export async function provisionLivestreamMember(order: ShopifyOrder): Promise<Pr
 
   const { data: existing, error: selErr } = await supabase
     .from('members')
-    .select('email,password_token')
+    .select('*')
     .eq('email', email)
     .maybeSingle()
   if (selErr) throw new Error(`member lookup failed: ${selErr.message}`)
 
   if (existing) {
-    return { status: 'exists', email, password_token: existing.password_token }
+    return { status: 'exists', member: toDeliverable(existing) }
   }
 
-  const password_token = randomUUID()
   const insertPayload = {
     name,
     email,
-    password_token,
+    password_token: makePassword(),
     access_badges: ['dreamplay_buyer'],
     display_name: name,
     is_moderator: false,
@@ -101,14 +117,14 @@ export async function provisionLivestreamMember(order: ShopifyOrder): Promise<Pr
   let { data, error } = await supabase
     .from('members')
     .insert(insertPayload)
-    .select('email,password_token')
+    .select('*')
     .single()
   if (error && isMissingAccessBadgesColumn(error)) {
     const { access_badges: _accessBadges, ...legacyPayload } = insertPayload
     const retry = await supabase
       .from('members')
       .insert(legacyPayload)
-      .select('email,password_token')
+      .select('*')
       .single()
     data = retry.data
     error = retry.error
@@ -118,13 +134,13 @@ export async function provisionLivestreamMember(order: ShopifyOrder): Promise<Pr
     if (error.code === '23505') {
       const { data: row } = await supabase
         .from('members')
-        .select('email,password_token')
+        .select('*')
         .eq('email', email)
         .single()
-      if (row) return { status: 'exists', email, password_token: row.password_token }
+      if (row) return { status: 'exists', member: toDeliverable(row) }
     }
     throw new Error(`member insert failed: ${error.message}`)
   }
 
-  return { status: 'created', email, password_token: data.password_token }
+  return { status: 'created', member: toDeliverable(data) }
 }

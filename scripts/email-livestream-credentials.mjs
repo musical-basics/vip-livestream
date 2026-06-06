@@ -15,6 +15,7 @@
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs                 # dry-run (default)
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --only=you@x.com  # restrict to one/few (comma-sep)
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --only=you@x.com --apply  # real test send to yourself
+ *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --unsent-only --apply # email ONLY buyers who haven't received yet
  *   node --env-file=.env.local scripts/email-livestream-credentials.mjs --apply         # resend current credentials to everyone
  *
  * Note: --rotate / --no-send are disabled (rotation is off). They will error out.
@@ -42,6 +43,10 @@ const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const ONLY = onlyArg
   ? new Set(onlyArg.slice("--only=".length).split(",").map((s) => s.trim().toLowerCase()))
   : null;
+// --unsent-only: email ONLY members who have never received credentials
+// (credentials_sent_at is null). Use this to catch buyers the webhook missed
+// without re-spamming everyone who was already emailed.
+const UNSENT_ONLY = process.argv.includes("--unsent-only");
 // --test=<email>: send ONE sample email (dummy password) to <email>, no DB reads/writes.
 const testArg = process.argv.find((a) => a.startsWith("--test="));
 const TEST_TO = testArg ? testArg.slice("--test=".length).trim() : null;
@@ -104,6 +109,12 @@ function uniquePassword(used) {
 function firstName(name) {
   return (name || "").trim().split(/\s+/)[0] || "there";
 }
+
+// A UUID-shaped token is assigned by the webhook / sync script, never a
+// human-typed password. A member who was never emailed but holds one gets a
+// fresh 6-letter password on their first send (initial assignment, not a
+// rotation — nothing was ever communicated, so nothing breaks).
+const UUID_TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function renderEmail({ name, email, password, memberId }) {
   const greeting = firstName(name);
@@ -199,11 +210,28 @@ async function main() {
     return;
   }
 
-  const { data: all, error } = await supabase
+  // Try to read credentials_sent_at; fall back if the column isn't migrated yet.
+  let hasSentColumn = true;
+  let { data: all, error } = await supabase
     .from("members")
-    .select("id,name,email,password_token,access_badges")
+    .select("id,name,email,password_token,access_badges,credentials_sent_at")
     .order("created_at");
+  if (error && /credentials_sent_at/.test(error.message || "")) {
+    hasSentColumn = false;
+    ({ data: all, error } = await supabase
+      .from("members")
+      .select("id,name,email,password_token,access_badges")
+      .order("created_at"));
+  }
   if (error) { console.error("❌ DB read failed:", error.message); process.exit(1); }
+
+  if (UNSENT_ONLY && !hasSentColumn) {
+    console.error(
+      "❌ --unsent-only needs the credentials_sent_at column. Run " +
+      "supabase/migrate-credentials-sent.sql in the Supabase SQL editor first."
+    );
+    process.exit(1);
+  }
 
   // --preview-to: send one real member's real email to a chosen inbox, no writes.
   if (PREVIEW_TO) {
@@ -224,6 +252,7 @@ async function main() {
 
   let recipients = all.filter((m) => !isTestAccount(m));
   if (ONLY) recipients = recipients.filter((m) => ONLY.has(m.email.toLowerCase()));
+  if (UNSENT_ONLY) recipients = recipients.filter((m) => !m.credentials_sent_at);
 
   const usedPasswords = new Set(all.map((m) => m.password_token).filter(Boolean));
 
@@ -241,7 +270,12 @@ async function main() {
   const failures = [];
 
   for (const m of recipients) {
-    const shouldGeneratePassword = ROTATE || !m.password_token;
+    // Assign a typable password when the member has none, or holds a UUID token
+    // they were never emailed (webhook/sync default). Already-emailed passwords
+    // are always reused — never rotated.
+    const neverSent = !m.credentials_sent_at;
+    const needsTypablePassword = neverSent && UUID_TOKEN.test(m.password_token || "");
+    const shouldGeneratePassword = ROTATE || !m.password_token || needsTypablePassword;
     const password = shouldGeneratePassword ? uniquePassword(usedPasswords) : m.password_token;
     if (!APPLY) {
       const action = shouldGeneratePassword ? "would generate+email" : "would email";
@@ -266,6 +300,14 @@ async function main() {
       const { html, text } = renderEmail({ name: m.name, email: m.email, password, memberId: m.id });
       const id = await sendEmail({ to: m.email, subject, html, text });
       sent++;
+      // Record the send so --unsent-only and the webhook never re-email them.
+      if (hasSentColumn) {
+        const { error: stampErr } = await supabase
+          .from("members")
+          .update({ credentials_sent_at: new Date().toISOString() })
+          .eq("id", m.id);
+        if (stampErr) console.log(`  ⚠ could not stamp credentials_sent_at for ${m.email}: ${stampErr.message}`);
+      }
       console.log(`  sent  ${m.email.padEnd(34)} pw=${password}  (id ${id})`);
     } catch (e) {
       failures.push({ email: m.email, password, error: e.message });
