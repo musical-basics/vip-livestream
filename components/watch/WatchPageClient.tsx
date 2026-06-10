@@ -203,6 +203,31 @@ export default function WatchPageClient({
   const [isLeaderboardRefreshing, setIsLeaderboardRefreshing] = useState(false)
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null)
 
+  // Crowd-sourced "stream is down" report. Viewers are the real signal when the
+  // encoder/app claims it's still live but the feed is actually black. Once
+  // enough distinct viewers report, the API alerts the operators. Repeat taps
+  // (incl. after a refresh) are harmless — the server de-dupes per member.
+  const [reportingDown, setReportingDown] = useState(false)
+  const [streamDownReported, setStreamDownReported] = useState(false)
+
+  const reportStreamDown = useCallback(async () => {
+    if (!streamId || reportingDown || streamDownReported) return
+    setReportingDown(true)
+    try {
+      await fetch('/api/stream/report-down', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stream_id: streamId }),
+      })
+    } catch (err) {
+      console.error(err)
+    } finally {
+      // Mark reported either way — the team still gets the signal from other viewers.
+      setStreamDownReported(true)
+      setReportingDown(false)
+    }
+  }, [streamId, reportingDown, streamDownReported])
+
   const fetchCurrentLeaderboard = useCallback(async (refresh = false) => {
     if (!streamId) {
       setIsLeaderboardLoading(false)
@@ -673,6 +698,20 @@ export default function WatchPageClient({
                 </button>
               )
             })}
+          </div>
+          <div className="mx-auto mt-1.5 flex w-full max-w-2xl justify-center">
+            <button
+              type="button"
+              onClick={reportStreamDown}
+              disabled={reportingDown || streamDownReported}
+              className="text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground/70"
+            >
+              {streamDownReported
+                ? '✓ Thanks — we’ve flagged the stream for the team'
+                : reportingDown
+                  ? 'Reporting…'
+                  : '⚠ Stream not playing? Tap to report it'}
+            </button>
           </div>
         </div>
       )}
