@@ -192,24 +192,44 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
 
   async function updateStreamLinks(stream: Stream) {
     const draft = linkDrafts[stream.id] ?? streamToLinkDraft(stream)
-    const videoId = extractYouTubeVideoId(draft.youtube_video_id)
-    const backupVideoId1 = draft.backup_youtube_video_id_1.trim()
-      ? extractYouTubeVideoId(draft.backup_youtube_video_id_1)
-      : ''
-    const backupVideoId2 = draft.backup_youtube_video_id_2.trim()
-      ? extractYouTubeVideoId(draft.backup_youtube_video_id_2)
-      : ''
 
-    if (!videoId) {
-      alert('Please enter a valid Main Stream YouTube URL or video ID.')
-      return
+    // Blank = "leave this stream as-is" (never cleared, never an error). Only the
+    // fields the operator actually fills get swapped, so they can fix the main
+    // feed, a backup, or both without disturbing the others — e.g. when a venue
+    // internet blip forces restarting more than one stream with new links.
+    const body: {
+      stream_id: string
+      youtube_video_id?: string
+      backup_youtube_video_id_1?: string
+      backup_youtube_video_id_2?: string
+    } = { stream_id: stream.id }
+
+    const linkFields: Array<{
+      field: 'youtube_video_id' | 'backup_youtube_video_id_1' | 'backup_youtube_video_id_2'
+      label: string
+    }> = [
+      { field: 'youtube_video_id', label: 'Main Stream' },
+      { field: 'backup_youtube_video_id_1', label: 'Backup Stream 1' },
+      { field: 'backup_youtube_video_id_2', label: 'Backup Stream 2' },
+    ]
+
+    for (const { field, label } of linkFields) {
+      const raw = draft[field].trim()
+      if (!raw) continue // blank → keep whatever is currently set
+      const id = extractYouTubeVideoId(raw)
+      if (!id) {
+        alert(`Please enter a valid ${label} YouTube URL or video ID — or clear it to leave that stream unchanged.`)
+        return
+      }
+      body[field] = id
     }
-    if (draft.backup_youtube_video_id_1.trim() && !backupVideoId1) {
-      alert('Please enter a valid Backup Stream 1 YouTube URL or video ID.')
-      return
-    }
-    if (draft.backup_youtube_video_id_2.trim() && !backupVideoId2) {
-      alert('Please enter a valid Backup Stream 2 YouTube URL or video ID.')
+
+    if (
+      body.youtube_video_id === undefined &&
+      body.backup_youtube_video_id_1 === undefined &&
+      body.backup_youtube_video_id_2 === undefined
+    ) {
+      alert('Nothing to update — paste a new link into at least one field. Blank fields keep their current link.')
       return
     }
 
@@ -218,12 +238,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
       const res = await fetch('/api/admin/stream', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          stream_id: stream.id,
-          youtube_video_id: videoId,
-          backup_youtube_video_id_1: backupVideoId1 || null,
-          backup_youtube_video_id_2: backupVideoId2 || null,
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -331,6 +346,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
             <input
               value={draft.youtube_video_id}
               onChange={(e) => updateDraft('youtube_video_id', e.target.value)}
+              placeholder="Leave blank to keep current"
               className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs transition-colors focus:border-[oklch(0.75_0.12_85)] focus:outline-none"
             />
           </label>
@@ -341,7 +357,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
             <input
               value={draft.backup_youtube_video_id_1}
               onChange={(e) => updateDraft('backup_youtube_video_id_1', e.target.value)}
-              placeholder="Optional"
+              placeholder="Leave blank to keep current"
               className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs transition-colors focus:border-[oklch(0.75_0.12_85)] focus:outline-none"
             />
           </label>
@@ -352,11 +368,16 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
             <input
               value={draft.backup_youtube_video_id_2}
               onChange={(e) => updateDraft('backup_youtube_video_id_2', e.target.value)}
-              placeholder="Optional"
+              placeholder="Leave blank to keep current"
               className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs transition-colors focus:border-[oklch(0.75_0.12_85)] focus:outline-none"
             />
           </label>
         </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          Paste a new YouTube link (full URL or ID) into any feed to swap it. Fill one or
+          both — <span className="text-foreground">a blank field keeps its current link, never erases it.</span>{' '}
+          Viewers switch automatically, no refresh needed.
+        </p>
         <div className="mt-3 flex justify-end">
           <Button
             onClick={() => updateStreamLinks(stream)}
