@@ -146,6 +146,7 @@ export default function WatchPageClient({
     streamSources.find((source) => source.id === selectedStreamSource && source.videoId) ??
     streamSources.find((source) => source.videoId) ??
     streamSources[0]
+  const backup1Available = !!streamSources.find((source) => source.id === 'backup1')?.videoId
 
   const [autoSwitchingTo, setAutoSwitchingTo] = useState<{ label: string; id: StreamSourceId; countdown: number } | null>(null)
 
@@ -699,19 +700,38 @@ export default function WatchPageClient({
               )
             })}
           </div>
-          <div className="mx-auto mt-1.5 flex w-full max-w-2xl justify-center">
-            <button
-              type="button"
-              onClick={reportStreamDown}
-              disabled={reportingDown || streamDownReported}
-              className="text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground/70"
-            >
-              {streamDownReported
-                ? '✓ Thanks — we’ve flagged the stream for the team'
-                : reportingDown
-                  ? 'Reporting…'
-                  : '⚠ Stream not playing? Tap to report it'}
-            </button>
+          <div className="mx-auto mt-1.5 w-full max-w-2xl">
+            <p className="text-center text-[11px] leading-snug text-muted-foreground">
+              Video frozen or dropped?{' '}
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="font-medium text-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-[oklch(0.75_0.12_85)]"
+              >
+                Refresh the page
+              </button>
+              {backup1Available ? (
+                <>
+                  , or switch to <span className="font-medium text-foreground">Backup Stream 1</span> above.
+                </>
+              ) : (
+                '.'
+              )}
+            </p>
+            <div className="mt-1 flex justify-center">
+              <button
+                type="button"
+                onClick={reportStreamDown}
+                disabled={reportingDown || streamDownReported}
+                className="text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground/70"
+              >
+                {streamDownReported
+                  ? '✓ Thanks — we’ve flagged the stream for the team'
+                  : reportingDown
+                    ? 'Reporting…'
+                    : '⚠ Stream not playing? Tap to report it'}
+              </button>
+            </div>
           </div>
         </div>
       )}

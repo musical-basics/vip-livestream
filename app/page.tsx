@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { Film, LogIn } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import LoginForm from '@/components/LoginForm'
+import ResendCredentialsForm from '@/components/ResendCredentialsForm'
 
 export default async function HomePage({
   searchParams,
@@ -85,6 +86,9 @@ export default async function HomePage({
         <div id="login-card" className="glass scroll-mt-20 rounded-2xl p-6 shadow-2xl sm:p-8">
           <LoginForm defaultEmail={email ?? ''} defaultPassword={pw ?? ''} />
         </div>
+
+        {/* Lost / never received your invitation? Re-send it. */}
+        <ResendCredentialsForm />
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-6 opacity-50">

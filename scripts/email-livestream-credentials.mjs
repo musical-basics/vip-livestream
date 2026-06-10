@@ -136,6 +136,8 @@ function renderEmail({ name, email, password, memberId }) {
     `Email: ${email}`,
     `Password: ${password}`,
     ``,
+    `During the show: if the video freezes or drops, refresh the page, or switch to "Backup Stream 1" at the top of the player.`,
+    ``,
     `Please keep these details private. They're unique to you.`,
     ``,
     `See you at the concert,`,
@@ -161,7 +163,8 @@ function renderEmail({ name, email, password, memberId }) {
             <p style="margin:0;font-size:22px;letter-spacing:3px;color:#fff;font-family:ui-monospace,Menlo,Consolas,monospace;">${password}</p>
           </td></tr>
         </table>
-        <p style="margin:22px 0 0;font-size:13px;line-height:1.6;color:#8a8a92;">Please keep these details private. They're unique to you.</p>
+        <p style="margin:22px 0 0;font-size:13px;line-height:1.6;color:#9a9aa2;"><strong style="color:#c5a253;">During the show:</strong> if the video freezes or drops, refresh the page, or switch to &ldquo;Backup&nbsp;Stream&nbsp;1&rdquo; at the top of the player.</p>
+        <p style="margin:14px 0 0;font-size:13px;line-height:1.6;color:#8a8a92;">Please keep these details private. They're unique to you.</p>
       </td></tr>
       <tr><td style="padding:20px 36px 32px;border-top:1px solid #26262e;">
         <p style="margin:0;font-size:14px;color:#c7c7cc;">See you at the concert,<br/>Lionel</p>
