@@ -1,4 +1,7 @@
 import crypto from 'node:crypto'
+import { CONCERT } from '@/lib/concert'
+
+export { CONCERT }
 
 /**
  * Livestream credential email (login link + email/password), sent via Resend.
@@ -14,11 +17,6 @@ import crypto from 'node:crypto'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vip.musicalbasics.com'
 const EMAIL_FROM = process.env.EMAIL_FROM || 'Lionel Yu <lionel@musicalbasics.com>'
 const REPLY_TO = process.env.EMAIL_REPLY_TO || 'lionel@musicalbasics.com'
-
-export const CONCERT = {
-  name: 'Belgium Concert',
-  dateLine: 'Thursday 11 June 2026',
-}
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
 
@@ -129,3 +127,6 @@ export async function sendCredentialsEmail({
   if (!res.ok) throw new Error(body?.message || `Resend HTTP ${res.status}`)
   return body.id
 }
+
+/** Generic single-email send via Resend (same transport as credentials). */
+export const sendEmail = sendCredentialsEmail

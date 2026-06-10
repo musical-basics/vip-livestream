@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase-server'
+import { membersHaveNameColor, memberSelect } from '@/lib/optional-columns'
 
 export async function GET(request: NextRequest) {
   const member = await getSession()
@@ -52,11 +53,16 @@ export async function GET(request: NextRequest) {
       messageQuery = messageQuery.gte('created_at', monthlySince)
     }
 
+    // name_color is a pending migration in some environments; only request it
+    // when present so the whole query doesn't 400 (which is what makes the
+    // leaderboard fail to load entirely).
+    const hasNameColor = await membersHaveNameColor(supabase)
+
     const [messagesRes, membersRes] = await Promise.all([
       messageQuery,
       supabase
         .from('members')
-        .select('id, name, display_name, name_color, access_badges, is_moderator, is_admin')
+        .select(memberSelect(hasNameColor))
         .eq('is_admin', false)
         .eq('is_banned', false)
     ])
@@ -64,7 +70,17 @@ export async function GET(request: NextRequest) {
     if (messagesRes.error) throw messagesRes.error
     if (membersRes.error) throw membersRes.error
 
-    const memberMap = new Map(membersRes.data.map(m => [m.id, m]))
+    type MemberRow = {
+      id: string
+      name: string
+      display_name: string | null
+      name_color?: string | null
+      access_badges: string[]
+      is_moderator: boolean
+      is_admin: boolean
+    }
+    const memberRows = (membersRes.data ?? []) as unknown as MemberRow[]
+    const memberMap = new Map(memberRows.map(m => [m.id, m]))
     const tally: Record<string, {
       member_id: string
       display_name: string
@@ -87,7 +103,7 @@ export async function GET(request: NextRequest) {
           member_id: msg.member_id,
           display_name: activeMember.display_name || activeMember.name,
           name: activeMember.name,
-          name_color: activeMember.name_color,
+          name_color: (activeMember as { name_color?: string | null }).name_color ?? null,
           access_badges: activeMember.access_badges,
           is_moderator: activeMember.is_moderator,
           message_count: 0

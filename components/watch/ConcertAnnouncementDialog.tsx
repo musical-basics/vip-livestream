@@ -11,8 +11,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-const CONCERT_START_UTC = new Date('2026-06-11T17:00:00.000Z')
-const CONCERT_TIME_CEST = 'Thursday, June 11th, 2026 at 7:00 PM CEST'
+import { CONCERT, concertStart } from '@/lib/concert'
+
+const CONCERT_START_UTC = concertStart()
+const CONCERT_TIME_CEST = CONCERT.startLabelCest
 
 function subscribeToTimeZone() {
   return () => {}

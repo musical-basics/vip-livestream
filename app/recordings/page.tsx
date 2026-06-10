@@ -34,9 +34,20 @@ function formatDate(value: string | null) {
   }).format(new Date(value))
 }
 
+/**
+ * The archived recordings are test captures, so they are restricted to the
+ * dedicated test account. Everyone else gets a blank screen (no list, no
+ * "no recordings" copy) until real, public recordings are intentionally opened up.
+ */
+const RECORDINGS_ALLOWED_EMAIL = 'test@musicalbasics.com'
+
 export default async function RecordingsPage() {
   const member = await getSession()
   if (!member) redirect('/')
+
+  if (member.email?.toLowerCase() !== RECORDINGS_ALLOWED_EMAIL) {
+    return <main className="min-h-[100dvh]" />
+  }
 
   const supabase = createServiceClient()
   const { data } = await supabase

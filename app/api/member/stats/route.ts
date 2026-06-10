@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase-server'
+import { membersHaveNameColor, memberSelect } from '@/lib/optional-columns'
 
 export async function GET(request: NextRequest) {
   const sessionMember = await getSession()
@@ -17,10 +18,12 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceClient()
 
   try {
-    // 1. Query Member details
+    // 1. Query Member details. name_color is a pending migration in some
+    // environments; only request it when present so this doesn't 400.
+    const hasNameColor = await membersHaveNameColor(supabase)
     const { data: member, error: memberErr } = await supabase
       .from('members')
-      .select('id, name, display_name, name_color, access_badges, is_moderator, is_admin, created_at')
+      .select(memberSelect(hasNameColor, ', created_at'))
       .eq('id', memberId)
       .maybeSingle()
 

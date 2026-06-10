@@ -16,6 +16,7 @@ import ConcertAnnouncementDialog from './ConcertAnnouncementDialog'
 import LeaderboardPanel from './LeaderboardPanel'
 import MemberProfileModal from './MemberProfileModal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { MessageSquare, Music2, MessageCircle, RefreshCw, Trophy } from 'lucide-react'
 import { getStreamSources, type StreamSourceId } from '@/lib/stream-sources'
 
@@ -85,26 +86,32 @@ function VerticalDivider({ onPointerDown }: { onPointerDown: (e: ReactPointerEve
 
 function HorizontalDivider({ onPointerDown }: { onPointerDown: (e: ReactPointerEvent) => void }) {
   return (
-    <div
-      onPointerDown={onPointerDown}
-      className="hidden lg:flex h-3 cursor-row-resize touch-none items-center justify-center flex-shrink-0 group relative z-10"
-      style={{ background: 'transparent' }}
-      title="Drag to resize"
-    >
-      {/* Hover highlight strip */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-        style={{ background: 'linear-gradient(to right, transparent, oklch(0.75 0.12 85 / 0.12), transparent)' }}
-      />
-      {/* Grip dots */}
-      <div className="relative flex gap-[4px]">
-        {[0,1,2,3,4,5].map(i => (
-          <div
-            key={i}
-            className="h-[3px] w-[3px] rounded-full bg-white/20 group-hover:bg-[oklch(0.75_0.12_85)] transition-colors duration-150"
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          onPointerDown={onPointerDown}
+          className="hidden lg:flex h-3 cursor-row-resize touch-none items-center justify-center flex-shrink-0 group relative z-10"
+          style={{ background: 'transparent' }}
+        >
+          {/* Hover highlight strip */}
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+            style={{ background: 'linear-gradient(to right, transparent, oklch(0.75 0.12 85 / 0.12), transparent)' }}
           />
-        ))}
-      </div>
-    </div>
+          {/* Grip dots */}
+          <div className="relative flex gap-[4px]">
+            {[0,1,2,3,4,5].map(i => (
+              <div
+                key={i}
+                className="h-[3px] w-[3px] rounded-full bg-white/20 group-hover:bg-[oklch(0.75_0.12_85)] transition-colors duration-150"
+              />
+            ))}
+          </div>
+        </div>
+      </TooltipTrigger>
+      {/* Smaller screens can have the video fill the viewport, hiding the
+          programme below — this hints that the bar drags to reveal it. */}
+      <TooltipContent side="top">Click to redrag and resize the video</TooltipContent>
+    </Tooltip>
   )
 }
 
