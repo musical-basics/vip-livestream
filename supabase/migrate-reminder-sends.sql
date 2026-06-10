@@ -14,3 +14,9 @@ CREATE TABLE IF NOT EXISTS vip_livestream.reminder_sends (
 
 CREATE INDEX IF NOT EXISTS idx_reminder_sends_window
   ON vip_livestream.reminder_sends (reminder_window);
+
+-- Only the cron (service-role client) ever touches this table, and the service
+-- role bypasses RLS. Enabling RLS with NO policies therefore denies all access
+-- via the public anon/authenticated keys (no public read, no bogus inserts that
+-- could make the cron skip real reminders) while the cron keeps working.
+ALTER TABLE vip_livestream.reminder_sends ENABLE ROW LEVEL SECURITY;
