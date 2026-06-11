@@ -136,13 +136,11 @@ export const sendEmail = sendCredentialsEmail
 
 export function renderStreamLinksEmail({
   name,
-  email,
-  password,
   stream,
 }: {
   name: string
-  email: string
-  password: string
+  email?: string
+  password?: string
   stream: {
     title: string
     youtube_video_id: string
@@ -152,8 +150,7 @@ export function renderStreamLinksEmail({
   }
 }) {
   const greeting = name.trim().split(/\s+/)[0] || 'there'
-  const directUrl = `${APP_URL}/watch/direct?email=${encodeURIComponent(email)}&pw=${encodeURIComponent(password)}`
-  const subject = `🔴 Live Stream Links: ${stream.title}`
+  const subject = `🔴 YouTube Live Stream Links: ${stream.title}`
 
   const mainUrl = `https://youtube.com/watch?v=${stream.youtube_video_id}`
   const backup1Url = stream.backup_youtube_video_id_1 ? `https://youtube.com/watch?v=${stream.backup_youtube_video_id_1}` : null
@@ -162,7 +159,7 @@ export function renderStreamLinksEmail({
   const textLines = [
     `Hi ${greeting},`,
     ``,
-    `The livestream for "${stream.title}" is ready!`,
+    `The YouTube live stream for "${stream.title}" is ready!`,
     ``,
     `Below are the direct links to watch using your YouTube app (ideal for casting to TV or watching on mobile):`,
     ``,
@@ -178,8 +175,7 @@ export function renderStreamLinksEmail({
 
   textLines.push(
     ``,
-    `Alternatively, you can open our simplified VIP portal where you can access all these links:`,
-    directUrl,
+    `Click these links to open directly in your YouTube app to watch or cast to your TV.`,
     ``,
     `See you at the concert!`,
     `Lionel`
@@ -197,20 +193,15 @@ export function renderStreamLinksEmail({
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
     <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#15151a;border:1px solid #26262e;border-radius:16px;overflow:hidden;">
       <tr><td style="padding:32px 36px 8px;">
-        <p style="margin:0 0 4px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#9a8a55;">VIP Livestream Links</p>
+        <p style="margin:0 0 4px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#9a8a55;">YouTube Livestream</p>
         <h1 style="margin:0 0 16px;font-size:22px;font-weight:600;color:#fff;">${stream.title}</h1>
         <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#c7c7cc;">Hi ${greeting},</p>
-        <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#c7c7cc;">The livestream is ready. You can watch using your YouTube app (ideal for casting to TV) or use our VIP Portal.</p>
+        <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#c7c7cc;">The YouTube live stream is ready. Click the links below to open directly in your YouTube app to watch or cast to your TV.</p>
 
         <p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#7a7a82;">Main Feed</p>
         <a href="${mainUrl}" style="display:block;text-align:center;background:#c5a253;color:#1a1a1a;text-decoration:none;font-weight:600;font-size:16px;padding:14px 28px;border-radius:10px;margin-bottom:12px;">Watch Main Stream on YouTube &rarr;</a>
 
         ${backupSectionHtml}
-
-        <div style="margin:24px 0;border-top:1px solid #26262e;padding-top:16px;">
-          <p style="margin:0 0 8px;font-size:13px;color:#c7c7cc;text-align:center;">Prefer our simplified web portal?</p>
-          <a href="${directUrl}" style="display:block;text-align:center;color:#c5a253;text-decoration:none;font-size:14px;font-weight:600;">Open VIP Web Portal &rarr;</a>
-        </div>
       </td></tr>
       <tr><td style="padding:20px 36px 32px;border-top:1px solid #26262e;">
         <p style="margin:0;font-size:14px;color:#c7c7cc;">See you at the concert,<br/>Lionel</p>
