@@ -106,3 +106,46 @@ export async function sendStreamLinksAction(streamId: string) {
 
   return { success: true, sentCount, failedCount }
 }
+
+export async function sendTestStreamLinksAction(streamId: string, testEmail: string) {
+  const adminMember = await getSession()
+  if (!isAdmin(adminMember)) {
+    return { error: 'Forbidden' }
+  }
+
+  if (!testEmail?.trim()) {
+    return { error: 'Test email address is required' }
+  }
+
+  const supabase = createServiceClient()
+
+  // 1. Fetch stream
+  const { data: stream, error: streamError } = await supabase
+    .from('streams')
+    .select('*')
+    .eq('id', streamId)
+    .single()
+
+  if (streamError || !stream) {
+    return { error: 'Stream not found' }
+  }
+
+  try {
+    const { subject, html, text } = renderStreamLinksEmail({
+      name: 'Test Recipient',
+      stream,
+    })
+
+    await sendEmail({
+      to: testEmail.trim(),
+      subject,
+      html,
+      text,
+    })
+
+    return { success: true }
+  } catch (err) {
+    console.error(`Failed to send test email to ${testEmail}:`, err)
+    return { error: err instanceof Error ? err.message : 'Failed to send test email' }
+  }
+}

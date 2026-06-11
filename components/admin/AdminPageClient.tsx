@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { sendStreamLinksAction } from '@/app/actions'
+import { sendStreamLinksAction, sendTestStreamLinksAction } from '@/app/actions'
 
 interface AdminPageClientProps {
   currentMember: Member
@@ -61,6 +61,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     () => Object.fromEntries(streams.map((stream) => [stream.id, streamToLinkDraft(stream)]))
   )
   const [emailStatus, setEmailStatus] = useState<string | null>(null)
+  const [testEmail, setTestEmail] = useState(currentMember.email)
 
   // New stream form
     const [newStream, setNewStream] = useState({
@@ -278,6 +279,31 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     }
   }
 
+  async function handleSendTestEmail(stream: Stream) {
+    if (!testEmail?.trim()) {
+      alert('Please enter a test email address.')
+      return
+    }
+
+    setLoadingId(`test-email-${stream.id}`)
+    setEmailStatus(`Sending test email to ${testEmail}...`)
+
+    try {
+      const result = await sendTestStreamLinksAction(stream.id, testEmail)
+      if (result.error) {
+        alert(`Error: ${result.error}`)
+      } else {
+        alert(`Successfully sent test email to ${testEmail}.`)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('An unexpected error occurred while sending test email.')
+    } finally {
+      setLoadingId(null)
+      setEmailStatus(null)
+    }
+  }
+
   async function toggleModerator(member: Member) {
     setLoadingId(member.id)
     const res = await fetch('/api/admin/member', {
@@ -403,6 +429,34 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
             )}
             Save Stream Sources
           </Button>
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Test Email Links
+          </span>
+          <div className="flex items-center gap-2 flex-1 max-w-sm">
+            <input
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="admin@example.com"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs focus:border-[oklch(0.75_0.12_85)] focus:outline-none"
+            />
+            <Button
+              onClick={() => handleSendTestEmail(stream)}
+              disabled={loadingId !== null || !testEmail?.trim()}
+              size="xs"
+              variant="secondary"
+              className="rounded-lg text-[10px] font-semibold tracking-wider uppercase h-7 px-3 bg-white/10 hover:bg-white/15 hover:text-white"
+            >
+              {loadingId === `test-email-${stream.id}` ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                'Send Test'
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     )
