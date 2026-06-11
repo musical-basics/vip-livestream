@@ -163,7 +163,15 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
             : s
           )
         )
-      setLinkDrafts((prev) => ({ ...prev, [updatedStream.id]: streamToLinkDraft(updatedStream) }))
+      // Going live does NOT touch the stream URLs, so do not overwrite the link
+      // editor with the stored values — that would silently discard any new URL
+      // an operator typed but hasn't saved yet (use "Save Stream Sources" for
+      // links). Only seed a draft if this stream somehow has none.
+      setLinkDrafts((prev) =>
+        prev[updatedStream.id]
+          ? prev
+          : { ...prev, [updatedStream.id]: streamToLinkDraft(updatedStream) }
+      )
     }
     setLoadingId(null)
   }
@@ -330,7 +338,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
       setLinkDrafts((prev) => ({
         ...prev,
         [stream.id]: {
-          ...draft,
+          ...(prev[stream.id] ?? draft),
           [field]: value,
         },
       }))
