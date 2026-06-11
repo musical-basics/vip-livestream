@@ -133,3 +133,91 @@ export async function sendCredentialsEmail({
 
 /** Generic single-email send via Resend (same transport as credentials). */
 export const sendEmail = sendCredentialsEmail
+
+export function renderStreamLinksEmail({
+  name,
+  email,
+  password,
+  stream,
+}: {
+  name: string
+  email: string
+  password: string
+  stream: {
+    title: string
+    youtube_video_id: string
+    backup_youtube_video_id_1: string | null
+    backup_youtube_video_id_2: string | null
+    description?: string | null
+  }
+}) {
+  const greeting = name.trim().split(/\s+/)[0] || 'there'
+  const directUrl = `${APP_URL}/watch/direct?email=${encodeURIComponent(email)}&pw=${encodeURIComponent(password)}`
+  const subject = `🔴 Live Stream Links: ${stream.title}`
+
+  const mainUrl = `https://youtube.com/watch?v=${stream.youtube_video_id}`
+  const backup1Url = stream.backup_youtube_video_id_1 ? `https://youtube.com/watch?v=${stream.backup_youtube_video_id_1}` : null
+  const backup2Url = stream.backup_youtube_video_id_2 ? `https://youtube.com/watch?v=${stream.backup_youtube_video_id_2}` : null
+
+  const textLines = [
+    `Hi ${greeting},`,
+    ``,
+    `The livestream for "${stream.title}" is ready!`,
+    ``,
+    `Below are the direct links to watch using your YouTube app (ideal for casting to TV or watching on mobile):`,
+    ``,
+    `👉 Main Stream: ${mainUrl}`,
+  ]
+
+  if (backup1Url) {
+    textLines.push(`👉 Backup Stream 1: ${backup1Url}`)
+  }
+  if (backup2Url) {
+    textLines.push(`👉 Backup Stream 2: ${backup2Url}`)
+  }
+
+  textLines.push(
+    ``,
+    `Alternatively, you can open our simplified VIP portal where you can access all these links:`,
+    directUrl,
+    ``,
+    `See you at the concert!`,
+    `Lionel`
+  )
+
+  const text = textLines.join('\n')
+
+  const backupSectionHtml = (backup1Url || backup2Url) ? `
+    <p style="margin:20px 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#7a7a82;">Backup Feeds</p>
+    ${backup1Url ? `<a href="${backup1Url}" style="display:block;text-align:center;background:#1c1c24;border:1px solid #c5a253;color:#c5a253;text-decoration:none;font-weight:600;font-size:15px;padding:12px 20px;border-radius:10px;margin-bottom:10px;">Watch Backup Stream 1 &rarr;</a>` : ''}
+    ${backup2Url ? `<a href="${backup2Url}" style="display:block;text-align:center;background:#1c1c24;border:1px solid #c5a253;color:#c5a253;text-decoration:none;font-weight:600;font-size:15px;padding:12px 20px;border-radius:10px;margin-bottom:10px;">Watch Backup Stream 2 &rarr;</a>` : ''}
+  ` : ''
+
+  const html = `<!doctype html><html><body style="margin:0;background:#0d0d10;padding:32px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e8e8ea;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#15151a;border:1px solid #26262e;border-radius:16px;overflow:hidden;">
+      <tr><td style="padding:32px 36px 8px;">
+        <p style="margin:0 0 4px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#9a8a55;">VIP Livestream Links</p>
+        <h1 style="margin:0 0 16px;font-size:22px;font-weight:600;color:#fff;">${stream.title}</h1>
+        <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#c7c7cc;">Hi ${greeting},</p>
+        <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#c7c7cc;">The livestream is ready. You can watch using your YouTube app (ideal for casting to TV) or use our VIP Portal.</p>
+
+        <p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#7a7a82;">Main Feed</p>
+        <a href="${mainUrl}" style="display:block;text-align:center;background:#c5a253;color:#1a1a1a;text-decoration:none;font-weight:600;font-size:16px;padding:14px 28px;border-radius:10px;margin-bottom:12px;">Watch Main Stream on YouTube &rarr;</a>
+
+        ${backupSectionHtml}
+
+        <div style="margin:24px 0;border-top:1px solid #26262e;padding-top:16px;">
+          <p style="margin:0 0 8px;font-size:13px;color:#c7c7cc;text-align:center;">Prefer our simplified web portal?</p>
+          <a href="${directUrl}" style="display:block;text-align:center;color:#c5a253;text-decoration:none;font-size:14px;font-weight:600;">Open VIP Web Portal &rarr;</a>
+        </div>
+      </td></tr>
+      <tr><td style="padding:20px 36px 32px;border-top:1px solid #26262e;">
+        <p style="margin:0;font-size:14px;color:#c7c7cc;">See you at the concert,<br/>Lionel</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`
+
+  return { subject, text, html }
+}

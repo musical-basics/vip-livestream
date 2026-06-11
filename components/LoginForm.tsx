@@ -8,9 +8,10 @@ import { Loader2, KeyRound, AlertCircle, Mail, ArrowRight } from 'lucide-react'
 interface LoginFormProps {
   defaultEmail?: string
   defaultPassword?: string
+  redirectTo?: string
 }
 
-export default function LoginForm({ defaultEmail = '', defaultPassword = '' }: LoginFormProps) {
+export default function LoginForm({ defaultEmail = '', defaultPassword = '', redirectTo = '/watch' }: LoginFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const autoSubmitted = useRef(false)
@@ -18,6 +19,7 @@ export default function LoginForm({ defaultEmail = '', defaultPassword = '' }: L
   function submit(formData: FormData) {
     setError(null)
     startTransition(async () => {
+      formData.set('redirectTo', redirectTo)
       const result = await loginAction(formData)
       if (result?.error) {
         setError(result.error)

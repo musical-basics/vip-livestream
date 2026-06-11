@@ -7,16 +7,15 @@ import ResendCredentialsForm from '@/components/ResendCredentialsForm'
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string; pw?: string }>
+  searchParams: Promise<{ email?: string; pw?: string; redirectTo?: string }>
 }) {
+  const { email, pw, redirectTo } = await searchParams
+
   // Already logged in
   const session = await getSession()
   if (session) {
-    redirect('/watch')
+    redirect(redirectTo || '/watch')
   }
-
-  // Direct-link credentials (e.g. from the invitation email): ?email=...&pw=...
-  const { email, pw } = await searchParams
 
   return (
     <main className="relative flex min-h-[100dvh] items-center justify-center px-4 py-6 sm:p-4">
@@ -84,7 +83,7 @@ export default async function HomePage({
 
         {/* Login card */}
         <div id="login-card" className="glass scroll-mt-20 rounded-2xl p-6 shadow-2xl sm:p-8">
-          <LoginForm defaultEmail={email ?? ''} defaultPassword={pw ?? ''} />
+          <LoginForm defaultEmail={email ?? ''} defaultPassword={pw ?? ''} redirectTo={redirectTo} />
         </div>
 
         {/* Lost / never received your invitation? Re-send it. */}

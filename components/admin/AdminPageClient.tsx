@@ -28,9 +28,11 @@ import {
   ArrowLeft,
   Archive,
   RefreshCw,
+  Mail,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
+import { sendStreamLinksAction } from '@/app/actions'
 
 interface AdminPageClientProps {
   currentMember: Member
@@ -60,6 +62,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
   const [linkDrafts, setLinkDrafts] = useState<Record<string, StreamLinkDraft>>(
     () => Object.fromEntries(streams.map((stream) => [stream.id, streamToLinkDraft(stream)]))
   )
+  const [emailStatus, setEmailStatus] = useState<string | null>(null)
 
   // New stream form
     const [newStream, setNewStream] = useState({
@@ -265,6 +268,32 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     }
   }
 
+  async function handleEmailLinks(stream: Stream) {
+    const activeMembers = memberList.filter(m => !m.is_banned)
+    const confirmSend = window.confirm(
+      `Are you sure you want to email the stream links for "${stream.title}" to all ${activeMembers.length} active members?`
+    )
+    if (!confirmSend) return
+
+    setLoadingId(`email-${stream.id}`)
+    setEmailStatus(`Sending emails to ${activeMembers.length} members...`)
+
+    try {
+      const result = await sendStreamLinksAction(stream.id)
+      if (result.error) {
+        alert(`Error: ${result.error}`)
+      } else {
+        alert(`Successfully sent emails to ${result.sentCount} members (failed: ${result.failedCount}).`)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('An unexpected error occurred while sending emails.')
+    } finally {
+      setLoadingId(null)
+      setEmailStatus(null)
+    }
+  }
+
   async function toggleModerator(member: Member) {
     setLoadingId(member.id)
     const res = await fetch('/api/admin/member', {
@@ -466,6 +495,12 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
 
           {/* ── STREAMS TAB ── */}
           <TabsContent value="streams" className="space-y-4">
+            {emailStatus && (
+              <div className="flex items-center gap-2.5 rounded-xl border border-[oklch(0.75_0.12_85)]/30 bg-[oklch(0.75_0.12_85)]/10 px-4 py-3 text-sm text-[oklch(0.75_0.12_85)]">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                <span>{emailStatus}</span>
+              </div>
+            )}
             {/* Create new stream button */}
             {!isCreating && (
               <Button
@@ -659,6 +694,20 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                         </Button>
                       )}
                       <Button
+                        onClick={() => handleEmailLinks(stream)}
+                        disabled={loadingId !== null}
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center justify-center gap-2 rounded-xl border border-white/10 hover:bg-white/5"
+                      >
+                        {loadingId === `email-${stream.id}` ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Mail className="w-3.5 h-3.5 text-[oklch(0.75_0.12_85)]" />
+                        )}
+                        Email Links to All
+                      </Button>
+                      <Button
                         onClick={() => toggleLive(stream)}
                         disabled={loadingId === stream.id}
                         size="sm"
@@ -729,22 +778,38 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                         <p className="text-sm text-muted-foreground mt-1.5">{stream.description}</p>
                       )}
                     </div>
-                    <Button
-                      onClick={() => toggleLive(stream)}
-                      disabled={loadingId === stream.id}
-                      size="sm"
-                      className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl sm:w-auto"
-                      style={{
-                        background: 'linear-gradient(135deg, oklch(0.60 0.22 25), oklch(0.45 0.18 10))',
-                        color: 'white',
-                      }}
-                    >
-                      {loadingId === stream.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <><Power className="w-3.5 h-3.5" /> Go Live</>
-                      )}
-                    </Button>
+                    <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+                      <Button
+                        onClick={() => handleEmailLinks(stream)}
+                        disabled={loadingId !== null}
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center justify-center gap-2 rounded-xl border border-white/10 hover:bg-white/5"
+                      >
+                        {loadingId === `email-${stream.id}` ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Mail className="w-3.5 h-3.5 text-[oklch(0.75_0.12_85)]" />
+                        )}
+                        Email Links to All
+                      </Button>
+                      <Button
+                        onClick={() => toggleLive(stream)}
+                        disabled={loadingId === stream.id}
+                        size="sm"
+                        className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl sm:w-auto"
+                        style={{
+                          background: 'linear-gradient(135deg, oklch(0.60 0.22 25), oklch(0.45 0.18 10))',
+                          color: 'white',
+                        }}
+                      >
+                        {loadingId === stream.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <><Power className="w-3.5 h-3.5" /> Go Live</>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
