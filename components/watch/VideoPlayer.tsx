@@ -9,6 +9,9 @@ interface VideoPlayerProps {
   fill?: boolean
   videoId?: string | null
   onPlaybackError?: (errorVideoId: string) => void
+  /** When false, the player loads paused (no autoplay). Used for the admin/test
+   *  account so their tab doesn't auto-play audio while testing the stream. */
+  autoplay?: boolean
 }
 
 type PlayerStatus = 'loading' | 'ready' | 'offline'
@@ -70,6 +73,7 @@ export default function VideoPlayer({
   fill = false,
   videoId: selectedVideoId,
   onPlaybackError,
+  autoplay = true,
 }: VideoPlayerProps) {
   const videoId = selectedVideoId?.trim() || stream?.youtube_video_id?.trim() || null
   const playerRef = useRef<YouTubePlayer | null>(null)
@@ -140,7 +144,7 @@ export default function VideoPlayer({
       height: '100%',
       videoId,
       playerVars: {
-        autoplay: 1,
+        autoplay: autoplay ? 1 : 0,
         controls: 1,
         rel: 0,
         modestbranding: 1,
@@ -168,8 +172,13 @@ export default function VideoPlayer({
             if (event.target.setPlaybackQuality) {
               event.target.setPlaybackQuality('default')
             }
-            event.target.playVideo?.()
-            setPlayback({ isPlaying: true, playerState: 'ready', videoId })
+            if (autoplay) {
+              event.target.playVideo?.()
+              setPlayback({ isPlaying: true, playerState: 'ready', videoId })
+            } else {
+              // Admin/test account: load paused so it doesn't blast audio during testing.
+              setPlayback({ isPlaying: false, playerState: 'ready', videoId })
+            }
           } catch (err) {
             console.error('YouTube play error:', err)
             setPlayback({ isPlaying: false, playerState: 'ready', videoId })
@@ -191,7 +200,7 @@ export default function VideoPlayer({
         },
       },
     })
-  }, [videoId, onPlaybackError])
+  }, [videoId, onPlaybackError, autoplay])
 
   const unmutePlayer = useCallback(() => {
     if (!playerRef.current) return

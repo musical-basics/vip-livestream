@@ -897,6 +897,7 @@ export default function WatchPageClient({
                 fill
                 videoId={selectedSource?.videoId}
                 onPlaybackError={handlePlaybackError}
+                autoplay={!member.is_admin}
               />
               <EmojiOverlay emojis={floatingEmojis} />
             </div>
@@ -936,6 +937,7 @@ export default function WatchPageClient({
               stream={stream}
               videoId={selectedSource?.videoId}
               onPlaybackError={handlePlaybackError}
+              autoplay={!member.is_admin}
             />
             <EmojiOverlay emojis={floatingEmojis} />
           </div>
