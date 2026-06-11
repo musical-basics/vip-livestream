@@ -61,12 +61,22 @@ export async function dispatchStreamDownAlert(opts: {
   let discord = false
   const webhook = process.env.DISCORD_ALERT_WEBHOOK_URL
   if (webhook) {
+    // Optionally @-mention specific people so they get a real push notification.
+    // DISCORD_ALERT_USER_IDS = comma-separated Discord user IDs (enable Developer
+    // Mode in Discord, then right-click a user → Copy User ID).
+    const userIds = (process.env.DISCORD_ALERT_USER_IDS || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const mention = userIds.map((id) => `<@${id}>`).join(' ')
     try {
       const res = await fetch(webhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: `🚨 **Livestream may be DOWN** — ${reportCount} viewers reported it.\nStream: **${streamTitle}**\nFix it: ${adminUrl}`,
+          content: `${mention ? mention + ' ' : ''}🚨 **Livestream may be DOWN** — ${reportCount} viewers reported it.\nStream: **${streamTitle}**\nFix it: ${adminUrl}`,
+          // Only ping the configured users — never @everyone by accident.
+          allowed_mentions: userIds.length ? { users: userIds } : { parse: [] },
         }),
       })
       discord = res.ok
