@@ -44,7 +44,7 @@ const EMAILS = emailArg
 const NAME_OVERRIDE = nameArg ? nameArg.slice("--name=".length).trim() : null;
 const BADGES = badgesArg
   ? badgesArg.slice("--badges=".length).split(",").map((s) => s.trim()).filter(Boolean)
-  : ["dreamplay_buyer"];
+  : ["vip_member"];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

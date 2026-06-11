@@ -109,7 +109,7 @@ export async function provisionLivestreamMember(order: ShopifyOrder): Promise<Pr
     name,
     email,
     password_token: makePassword(),
-    access_badges: ['dreamplay_buyer'],
+    access_badges: ['vip_member'],
     display_name: name,
     is_moderator: false,
     is_admin: false,

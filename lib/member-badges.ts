@@ -16,13 +16,6 @@ export const MEMBER_BADGES = [
     color: 'oklch(0.80 0.16 165)',
     className: 'border-[oklch(0.76_0.17_165)/50] text-[oklch(0.80_0.16_165)] bg-[oklch(0.76_0.17_165)/15]',
   },
-  {
-    id: 'dreamplay_buyer',
-    label: 'DreamPlay Buyer',
-    emoji: '✨',
-    color: 'oklch(0.80 0.18 310)',
-    className: 'border-[oklch(0.72_0.20_310)/50] text-[oklch(0.80_0.18_310)] bg-[oklch(0.72_0.20_310)/15]',
-  },
 ] as const
 
 export type MemberBadgeId = (typeof MEMBER_BADGES)[number]['id']

@@ -168,7 +168,7 @@ for (const p of toCreate) {
       name: p.name,
       email: p.email,
       password_token: token,
-      access_badges: ["dreamplay_buyer"],
+      access_badges: ["vip_member"],
       display_name: p.name,
       is_moderator: false,
     };
