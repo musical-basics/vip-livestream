@@ -141,12 +141,36 @@ export default function WatchPageClient({
       : null
   )
   const [selectedStreamSource, setSelectedStreamSource] = useState<StreamSourceId>('main')
-  const streamSources = useMemo(() => getStreamSources(stream), [stream])
+  // Live source IDs, seeded from the server render but updatable in place. This
+  // lets an admin swap ONE feed's link without forcing a full page reload, which
+  // would restart the feed the viewer is actually watching and snap them back to
+  // 'main'. Only the source whose ID actually changes re-initialises.
+  const [liveVideoIds, setLiveVideoIds] = useState(() => ({
+    youtube_video_id: stream?.youtube_video_id ?? '',
+    backup_youtube_video_id_1: stream?.backup_youtube_video_id_1 ?? null,
+    backup_youtube_video_id_2: stream?.backup_youtube_video_id_2 ?? null,
+  }))
+  const streamSources = useMemo(
+    () => getStreamSources(stream ? { ...stream, ...liveVideoIds } : null),
+    [stream, liveVideoIds]
+  )
   const selectedSource =
     streamSources.find((source) => source.id === selectedStreamSource && source.videoId) ??
     streamSources.find((source) => source.videoId) ??
     streamSources[0]
   const backup1Available = !!streamSources.find((source) => source.id === 'backup1')?.videoId
+
+  // Keep the latest source state in refs so handlePlaybackError stays
+  // identity-stable — otherwise it changes on every in-place source update and
+  // needlessly tears down the currently-playing YouTube player.
+  const selectedStreamSourceRef = useRef(selectedStreamSource)
+  const selectedSourceRef = useRef(selectedSource)
+  const streamSourcesRef = useRef(streamSources)
+  useEffect(() => {
+    selectedStreamSourceRef.current = selectedStreamSource
+    selectedSourceRef.current = selectedSource
+    streamSourcesRef.current = streamSources
+  }, [selectedStreamSource, selectedSource, streamSources])
 
   const [autoSwitchingTo, setAutoSwitchingTo] = useState<{ label: string; id: StreamSourceId; countdown: number } | null>(null)
 
@@ -169,20 +193,21 @@ export default function WatchPageClient({
   }, [autoSwitchingTo])
 
   const handlePlaybackError = useCallback((errorVideoId: string) => {
-    if (selectedSource?.videoId !== errorVideoId) return
+    if (selectedSourceRef.current?.videoId !== errorVideoId) return
 
-    const backup1Src = streamSources.find((s) => s.id === 'backup1')
-    const backup2Src = streamSources.find((s) => s.id === 'backup2')
+    const sources = streamSourcesRef.current
+    const backup1Src = sources.find((s) => s.id === 'backup1')
+    const backup2Src = sources.find((s) => s.id === 'backup2')
 
     let targetSource: typeof backup1Src | undefined = undefined
 
-    if (selectedStreamSource === 'main') {
+    if (selectedStreamSourceRef.current === 'main') {
       if (backup1Src?.videoId) {
         targetSource = backup1Src
       } else if (backup2Src?.videoId) {
         targetSource = backup2Src
       }
-    } else if (selectedStreamSource === 'backup1') {
+    } else if (selectedStreamSourceRef.current === 'backup1') {
       if (backup2Src?.videoId) {
         targetSource = backup2Src
       }
@@ -195,7 +220,7 @@ export default function WatchPageClient({
         countdown: 3,
       })
     }
-  }, [selectedStreamSource, selectedSource, streamSources])
+  }, [])
 
   // Leaderboard state & logic
   const streamId = stream?.id ?? null
@@ -462,6 +487,55 @@ export default function WatchPageClient({
     }, 1000)
   }, [])
 
+  // Apply a stream change in place when possible — swap just the source IDs so
+  // the viewer keeps watching their selected feed, instead of a full reload that
+  // restarts it and resets them to 'main'. Full reload only for the big
+  // transitions (went live, ended, or switched to a different live stream).
+  const syncStreamSources = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stream/sync', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = (await res.json()) as {
+        is_live?: boolean
+        stream_id?: string
+        youtube_video_id?: string
+        backup_youtube_video_id_1?: string | null
+        backup_youtube_video_id_2?: string | null
+      }
+
+      const pageLive = !!stream?.is_live
+      const dataLive = data.is_live === true
+      if (pageLive !== dataLive) {
+        refreshWatchPage() // live <-> offline transition needs a full render
+        return
+      }
+      if (!dataLive) return // both offline — nothing to do
+      if (data.stream_id !== stream?.id) {
+        refreshWatchPage() // switched to a different live stream
+        return
+      }
+
+      // Same live stream: swap source IDs in place (no reload, feed preserved).
+      setLiveVideoIds((prev) => {
+        const next = {
+          youtube_video_id: data.youtube_video_id ?? '',
+          backup_youtube_video_id_1: data.backup_youtube_video_id_1 ?? null,
+          backup_youtube_video_id_2: data.backup_youtube_video_id_2 ?? null,
+        }
+        if (
+          next.youtube_video_id === prev.youtube_video_id &&
+          next.backup_youtube_video_id_1 === prev.backup_youtube_video_id_1 &&
+          next.backup_youtube_video_id_2 === prev.backup_youtube_video_id_2
+        ) {
+          return prev // unchanged — avoid a needless re-render
+        }
+        return next
+      })
+    } catch {
+      // The next poll or event will retry.
+    }
+  }, [stream, refreshWatchPage])
+
   useEffect(() => {
     return () => {
       if (countdownIntervalRef.current) {
@@ -477,14 +551,14 @@ export default function WatchPageClient({
       .channel('stream-status')
       .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
       .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
-      .on('broadcast', { event: 'stream_updated' }, refreshWatchPage)
+      .on('broadcast', { event: 'stream_updated' }, () => void syncStreamSources())
       .subscribe()
     const currentStreamChannel = stream?.id
       ? supabase
           .channel(`stream:${stream.id}`)
           .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
           .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
-          .on('broadcast', { event: 'stream_updated' }, refreshWatchPage)
+          .on('broadcast', { event: 'stream_updated' }, () => void syncStreamSources())
           .on('broadcast', { event: 'new_message' }, ({ payload }) => {
             handleRealtimeMessage(payload as ChatMessage)
           })
@@ -495,7 +569,7 @@ export default function WatchPageClient({
       supabase.removeChannel(statusChannel)
       if (currentStreamChannel) supabase.removeChannel(currentStreamChannel)
     }
-  }, [stream?.id, refreshWatchPage, handleRealtimeMessage])
+  }, [stream?.id, refreshWatchPage, syncStreamSources, handleRealtimeMessage])
 
   // Realtime can be missed if a tab sleeps. Poll lightly as a safety net.
   useEffect(() => {
@@ -526,8 +600,12 @@ export default function WatchPageClient({
         const activeStreamEnded = !!stream?.is_live && data.is_live === false
         const streamCameOnline = !stream?.is_live && data.is_live === true
 
-        if (activeStreamChanged || activeStreamEnded || streamCameOnline) {
+        if (activeStreamEnded || streamCameOnline) {
           refreshWatchPage()
+        } else if (activeStreamChanged) {
+          // Source link(s) swapped on the same live stream — update in place so
+          // we don't restart the feed the viewer is currently watching.
+          void syncStreamSources()
         }
       } catch {
         // The next interval will try again.
@@ -554,6 +632,7 @@ export default function WatchPageClient({
     stream?.backup_youtube_video_id_1,
     stream?.backup_youtube_video_id_2,
     refreshWatchPage,
+    syncStreamSources,
   ])
 
   // Show tip success notification
