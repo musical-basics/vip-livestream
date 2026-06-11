@@ -43,14 +43,12 @@ interface AdminPageClientProps {
 interface StreamLinkDraft {
   youtube_video_id: string
   backup_youtube_video_id_1: string
-  backup_youtube_video_id_2: string
 }
 
 function streamToLinkDraft(stream: Stream): StreamLinkDraft {
   return {
     youtube_video_id: stream.youtube_video_id,
     backup_youtube_video_id_1: stream.backup_youtube_video_id_1 ?? '',
-    backup_youtube_video_id_2: stream.backup_youtube_video_id_2 ?? '',
   }
 }
 
@@ -68,8 +66,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     const [newStream, setNewStream] = useState({
       title: '',
       youtube_video_id: '',
-    backup_youtube_video_id_1: '',
-    backup_youtube_video_id_2: '',
+      backup_youtube_video_id_1: '',
       description: '',
       setlist: '',
     })
@@ -81,9 +78,6 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     const backupVideoId1 = newStream.backup_youtube_video_id_1.trim()
       ? extractYouTubeVideoId(newStream.backup_youtube_video_id_1)
       : ''
-    const backupVideoId2 = newStream.backup_youtube_video_id_2.trim()
-      ? extractYouTubeVideoId(newStream.backup_youtube_video_id_2)
-      : ''
     if (!videoId) {
       alert('Please enter a valid YouTube video URL or video ID.')
       setLoadingId(null)
@@ -91,11 +85,6 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
     }
     if (newStream.backup_youtube_video_id_1.trim() && !backupVideoId1) {
       alert('Please enter a valid Backup Stream 1 YouTube URL or video ID.')
-      setLoadingId(null)
-      return
-    }
-    if (newStream.backup_youtube_video_id_2.trim() && !backupVideoId2) {
-      alert('Please enter a valid Backup Stream 2 YouTube URL or video ID.')
       setLoadingId(null)
       return
     }
@@ -118,7 +107,6 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
           title: newStream.title,
           youtube_video_id: videoId,
         backup_youtube_video_id_1: backupVideoId1 || null,
-        backup_youtube_video_id_2: backupVideoId2 || null,
           description: newStream.description || null,
         setlist: parsedSetlist,
       }),
@@ -132,7 +120,6 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
         title: '',
         youtube_video_id: '',
         backup_youtube_video_id_1: '',
-        backup_youtube_video_id_2: '',
         description: '',
         setlist: '',
       })
@@ -212,16 +199,14 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
       stream_id: string
       youtube_video_id?: string
       backup_youtube_video_id_1?: string
-      backup_youtube_video_id_2?: string
     } = { stream_id: stream.id }
 
     const linkFields: Array<{
-      field: 'youtube_video_id' | 'backup_youtube_video_id_1' | 'backup_youtube_video_id_2'
+      field: 'youtube_video_id' | 'backup_youtube_video_id_1'
       label: string
     }> = [
       { field: 'youtube_video_id', label: 'Main Stream' },
       { field: 'backup_youtube_video_id_1', label: 'Backup Stream 1' },
-      { field: 'backup_youtube_video_id_2', label: 'Backup Stream 2' },
     ]
 
     for (const { field, label } of linkFields) {
@@ -237,8 +222,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
 
     if (
       body.youtube_video_id === undefined &&
-      body.backup_youtube_video_id_1 === undefined &&
-      body.backup_youtube_video_id_2 === undefined
+      body.backup_youtube_video_id_1 === undefined
     ) {
       alert('Nothing to update — paste a new link into at least one field. Blank fields keep their current link.')
       return
@@ -375,7 +359,7 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
 
     return (
       <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label className="space-y-1.5">
             <span className="block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Main Stream
@@ -394,17 +378,6 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
             <input
               value={draft.backup_youtube_video_id_1}
               onChange={(e) => updateDraft('backup_youtube_video_id_1', e.target.value)}
-              placeholder="Leave blank to keep current"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs transition-colors focus:border-[oklch(0.75_0.12_85)] focus:outline-none"
-            />
-          </label>
-          <label className="space-y-1.5">
-            <span className="block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Backup Stream 2
-            </span>
-            <input
-              value={draft.backup_youtube_video_id_2}
-              onChange={(e) => updateDraft('backup_youtube_video_id_2', e.target.value)}
               placeholder="Leave blank to keep current"
               className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs transition-colors focus:border-[oklch(0.75_0.12_85)] focus:outline-none"
             />
@@ -558,17 +531,6 @@ export default function AdminPageClient({ currentMember, streams, members }: Adm
                     <input
                       value={newStream.backup_youtube_video_id_1}
                       onChange={(e) => setNewStream((p) => ({ ...p, backup_youtube_video_id_1: e.target.value }))}
-                      placeholder="Optional YouTube live URL or video ID"
-                      className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-[oklch(0.75_0.12_85)] transition-colors font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1.5">
-                      Backup Stream 2
-                    </label>
-                    <input
-                      value={newStream.backup_youtube_video_id_2}
-                      onChange={(e) => setNewStream((p) => ({ ...p, backup_youtube_video_id_2: e.target.value }))}
                       placeholder="Optional YouTube live URL or video ID"
                       className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-[oklch(0.75_0.12_85)] transition-colors font-mono"
                     />

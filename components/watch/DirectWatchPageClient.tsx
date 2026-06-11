@@ -149,46 +149,26 @@ export default function DirectWatchPageClient({ member, stream }: DirectWatchPag
               </div>
 
               {/* Backup Feeds */}
-              {(backup1Url || backup2Url) && (
-                <div className="pt-2 border-t border-white/5 space-y-4">
+              {backup1Url && (
+                <div className="pt-2 border-t border-white/5 space-y-3">
                   <span className="block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80 px-1">
-                    Backup Feeds
+                    Backup Feed
                   </span>
                   
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {backup1Url && (
-                      <a href={backup1Url} target="_blank" rel="noopener noreferrer" className="block group">
-                        <Button
-                          variant="outline"
-                          className="w-full h-12 rounded-xl border-white/10 bg-white/5 hover:bg-white/8 hover:border-gold/30 hover:text-gold text-xs font-medium tracking-wide flex items-center justify-between px-4"
-                        >
-                          <span className="flex items-center gap-2">
-                            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current shrink-0 text-red-500" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.108C19.524 3.545 12 3.545 12 3.545s-7.525 0-9.387.51a3.003 3.003 0 0 0-2.11 2.108C0 8.025 0 12 0 12s0 3.975.503 5.837a3.003 3.003 0 0 0 2.11 2.108c1.862.51 9.387.51 9.387.51s7.525 0 9.387-.51a3.003 3.003 0 0 0 2.11-2.108C24 15.975 24 12 24 12s0-3.975-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                            </svg>
-                            Backup Feed 1
-                          </span>
-                          <ExternalLink className="w-4 h-4 opacity-50 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                        </Button>
-                      </a>
-                    )}
-                    {backup2Url && (
-                      <a href={backup2Url} target="_blank" rel="noopener noreferrer" className="block group">
-                        <Button
-                          variant="outline"
-                          className="w-full h-12 rounded-xl border-white/10 bg-white/5 hover:bg-white/8 hover:border-gold/30 hover:text-gold text-xs font-medium tracking-wide flex items-center justify-between px-4"
-                        >
-                          <span className="flex items-center gap-2">
-                            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current shrink-0 text-red-500" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.108C19.524 3.545 12 3.545 12 3.545s-7.525 0-9.387.51a3.003 3.003 0 0 0-2.11 2.108C0 8.025 0 12 0 12s0 3.975.503 5.837a3.003 3.003 0 0 0 2.11 2.108c1.862.51 9.387.51 9.387.51s7.525 0 9.387-.51a3.003 3.003 0 0 0 2.11-2.108C24 15.975 24 12 24 12s0-3.975-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                            </svg>
-                            Backup Feed 2
-                          </span>
-                          <ExternalLink className="w-4 h-4 opacity-50 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                        </Button>
-                      </a>
-                    )}
-                  </div>
+                  <a href={backup1Url} target="_blank" rel="noopener noreferrer" className="block group">
+                    <Button
+                      variant="outline"
+                      className="w-full h-12 rounded-xl border-white/10 bg-white/5 hover:bg-white/8 hover:border-gold/30 hover:text-gold text-xs font-medium tracking-wide flex items-center justify-between px-4"
+                    >
+                      <span className="flex items-center gap-2">
+                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current shrink-0 text-red-500" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.108C19.524 3.545 12 3.545 12 3.545s-7.525 0-9.387.51a3.003 3.003 0 0 0-2.11 2.108C0 8.025 0 12 0 12s0 3.975.503 5.837a3.003 3.003 0 0 0 2.11 2.108c1.862.51 9.387.51 9.387.51s7.525 0 9.387-.51a3.003 3.003 0 0 0 2.11-2.108C24 15.975 24 12 24 12s0-3.975-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        </svg>
+                        Backup Feed 1
+                      </span>
+                      <ExternalLink className="w-4 h-4 opacity-50 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </Button>
+                  </a>
                 </div>
               )}
             </div>

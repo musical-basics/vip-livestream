@@ -154,7 +154,6 @@ export function renderStreamLinksEmail({
 
   const mainUrl = `https://youtube.com/watch?v=${stream.youtube_video_id}`
   const backup1Url = stream.backup_youtube_video_id_1 ? `https://youtube.com/watch?v=${stream.backup_youtube_video_id_1}` : null
-  const backup2Url = stream.backup_youtube_video_id_2 ? `https://youtube.com/watch?v=${stream.backup_youtube_video_id_2}` : null
 
   const textLines = [
     `Hi ${greeting},`,
@@ -169,9 +168,6 @@ export function renderStreamLinksEmail({
   if (backup1Url) {
     textLines.push(`👉 Backup Stream 1: ${backup1Url}`)
   }
-  if (backup2Url) {
-    textLines.push(`👉 Backup Stream 2: ${backup2Url}`)
-  }
 
   textLines.push(
     ``,
@@ -183,10 +179,9 @@ export function renderStreamLinksEmail({
 
   const text = textLines.join('\n')
 
-  const backupSectionHtml = (backup1Url || backup2Url) ? `
+  const backupSectionHtml = backup1Url ? `
     <p style="margin:20px 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#7a7a82;">Backup Feeds</p>
-    ${backup1Url ? `<a href="${backup1Url}" style="display:block;text-align:center;background:#1c1c24;border:1px solid #c5a253;color:#c5a253;text-decoration:none;font-weight:600;font-size:15px;padding:12px 20px;border-radius:10px;margin-bottom:10px;">Watch Backup Stream 1 &rarr;</a>` : ''}
-    ${backup2Url ? `<a href="${backup2Url}" style="display:block;text-align:center;background:#1c1c24;border:1px solid #c5a253;color:#c5a253;text-decoration:none;font-weight:600;font-size:15px;padding:12px 20px;border-radius:10px;margin-bottom:10px;">Watch Backup Stream 2 &rarr;</a>` : ''}
+    <a href="${backup1Url}" style="display:block;text-align:center;background:#1c1c24;border:1px solid #c5a253;color:#c5a253;text-decoration:none;font-weight:600;font-size:15px;padding:12px 20px;border-radius:10px;margin-bottom:10px;">Watch Backup Stream 1 &rarr;</a>
   ` : ''
 
   const html = `<!doctype html><html><body style="margin:0;background:#0d0d10;padding:32px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e8e8ea;">
