@@ -17,7 +17,7 @@ import LeaderboardPanel from './LeaderboardPanel'
 import MemberProfileModal from './MemberProfileModal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { MessageSquare, Music2, MessageCircle, RefreshCw, Trophy } from 'lucide-react'
+import { MessageSquare, Music2, MessageCircle, RefreshCw, Trophy, ChevronDown } from 'lucide-react'
 import { getStreamSources, type StreamSourceId } from '@/lib/stream-sources'
 
 // ── Resize bounds ─────────────────────────────────────────────
@@ -581,7 +581,9 @@ export default function WatchPageClient({
     }, 2600)
   }
 
-  const [mobileTab, setMobileTab] = useState<'chat' | 'programme'>('chat')
+  // Mobile chat is a YouTube-style drawer that slides up over the programme.
+  // Open by default so chat is the first thing a mobile viewer sees.
+  const [mobileChatOpen, setMobileChatOpen] = useState(true)
 
   // Shared content blocks, rendered in either the desktop split layout or the
   // mobile tabbed layout. Defined once so nothing double-mounts.
@@ -847,8 +849,9 @@ export default function WatchPageClient({
           </div>
         </div>
       ) : (
-        /* Mobile: pinned video, then a Chat / Programme tab switcher */
-        <div className="flex flex-1 min-h-0 flex-col">
+        /* Mobile: pinned landscape video, programme underneath, and a
+           YouTube-style chat drawer that slides up over the programme. */
+        <div className="relative flex flex-1 min-h-0 flex-col">
           <div className="relative w-full flex-shrink-0 bg-black">
             <VideoPlayer
               stream={stream}
@@ -858,40 +861,54 @@ export default function WatchPageClient({
             <EmojiOverlay emojis={floatingEmojis} />
           </div>
 
-          <div className="grid grid-cols-2 shrink-0 glass-heavy border-b border-border/50">
-            <button
-              onClick={() => setMobileTab('chat')}
-              className={`flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
-                mobileTab === 'chat'
-                  ? 'text-foreground border-b-2 border-[oklch(0.75_0.12_85)]'
-                  : 'text-muted-foreground'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              Live Chat
-              {stream?.is_live && (
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 live-pulse inline-block" />
-              )}
-            </button>
-            <button
-              onClick={() => setMobileTab('programme')}
-              className={`flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
-                mobileTab === 'programme'
-                  ? 'text-foreground border-b-2 border-[oklch(0.75_0.12_85)]'
-                  : 'text-muted-foreground'
-              }`}
-            >
-              <Music2 className="w-4 h-4" />
-              Programme
-            </button>
+          {/* Base layer: programme, always present below the video. */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-24">
+            {programmeContent}
           </div>
 
-          <div className="flex-1 min-h-0">
-            <div className={mobileTab === 'chat' ? 'flex h-full flex-col' : 'hidden'}>
-              {chatPanel}
+          {/* Floating pill to reopen the chat once it's been dismissed. */}
+          {!mobileChatOpen && (
+            <button
+              type="button"
+              onClick={() => setMobileChatOpen(true)}
+              className="absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[oklch(0.75_0.12_85)] px-5 py-2.5 text-sm font-semibold text-[oklch(0.09_0.015_270)] shadow-xl shadow-black/40 transition-transform active:scale-95"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Live chat
+              {stream?.is_live && (
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 live-pulse inline-block" />
+              )}
+            </button>
+          )}
+
+          {/* Chat drawer — slides up over the programme; close to reveal it. */}
+          <div
+            className={`absolute inset-x-0 bottom-0 z-40 flex flex-col rounded-t-2xl glass-heavy border-t border-border/50 shadow-2xl shadow-black/50 transition-transform duration-300 ease-out ${
+              mobileChatOpen ? 'translate-y-0' : 'translate-y-full'
+            }`}
+            style={{ height: '62%' }}
+            aria-hidden={!mobileChatOpen}
+          >
+            <div className="flex flex-shrink-0 items-center gap-2 border-b border-border/50 px-4 py-3">
+              <MessageSquare className="w-4 h-4 text-[oklch(0.75_0.12_85)]" />
+              <span className="text-sm font-medium">Live Chat</span>
+              {stream?.is_live && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 live-pulse inline-block" />
+                  LIVE
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setMobileChatOpen(false)}
+                aria-label="Close chat"
+                className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+              >
+                <ChevronDown className="w-5 h-5" />
+              </button>
             </div>
-            <div className={mobileTab === 'programme' ? 'block h-full overflow-y-auto p-3 pb-6' : 'hidden'}>
-              {programmeContent}
+            <div className="flex min-h-0 flex-1 flex-col">
+              {chatPanel}
             </div>
           </div>
         </div>
