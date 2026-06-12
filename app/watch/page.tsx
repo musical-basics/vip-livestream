@@ -2,8 +2,38 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { getVerifiedLiveStream } from '@/lib/live-stream'
 import { createServiceClient } from '@/lib/supabase-server'
-import WatchPageClient from '@/components/watch/WatchPageClient'
+import { fetchYouTubeVideoMetadata } from '@/lib/youtube-metadata'
+import WatchPageClient, { type ReplayData } from '@/components/watch/WatchPageClient'
 import type { ChatMessage, Comment, Member, Stream } from '@/lib/database.types'
+
+// Supabase caps a single select at 1000 rows; page through to get the full
+// chat history of the show (a couple thousand messages at most).
+const CHAT_HISTORY_PAGE_SIZE = 1000
+const CHAT_HISTORY_MAX_PAGES = 10
+
+async function fetchFullChatHistory(
+  supabase: ReturnType<typeof createServiceClient>,
+  streamId: string
+): Promise<ChatMessage[]> {
+  const history: ChatMessage[] = []
+
+  for (let page = 0; page < CHAT_HISTORY_MAX_PAGES; page += 1) {
+    const from = page * CHAT_HISTORY_PAGE_SIZE
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('stream_id', streamId)
+      .eq('is_muted', false)
+      .order('created_at', { ascending: true })
+      .range(from, from + CHAT_HISTORY_PAGE_SIZE - 1)
+
+    const batch = (data ?? []) as ChatMessage[]
+    history.push(...batch)
+    if (batch.length < CHAT_HISTORY_PAGE_SIZE) break
+  }
+
+  return history
+}
 
 export default async function WatchPage() {
   const member = await getSession()
@@ -26,17 +56,36 @@ export default async function WatchPage() {
     roomStream = newestStream ?? null
   }
 
+  // When the room stream's broadcast has finished on YouTube, the page becomes
+  // a replay: the recording plays with the original chat re-appearing in sync.
+  // YouTube's actual on-air timestamp anchors video time 0:00, so each
+  // message's created_at maps to an exact video position.
+  let replay: ReplayData | null = null
+  const mainVideoId = roomStream?.youtube_video_id?.trim()
+  if (roomStream && mainVideoId) {
+    const metadata = await fetchYouTubeVideoMetadata(mainVideoId, { revalidate: 300 })
+    if (metadata.broadcastStatus === 'ended') {
+      replay = {
+        startUtc:
+          metadata.actualStartTime ?? roomStream.stream_start_utc ?? roomStream.created_at,
+        messages: await fetchFullChatHistory(supabase, roomStream.id),
+      }
+    }
+  }
+
   // Fetch room-dependent data in parallel once we have a stream record. When
   // the video is waiting, the newest stream record acts as the chat room.
   const [messagesRes, commentsRes, timeoutRes, membersRes] = roomStream
     ? await Promise.all([
-        supabase
-          .from('chat_messages')
-          .select('*')
-          .eq('stream_id', roomStream.id)
-          .eq('is_muted', false)
-          .order('created_at', { ascending: false })
-          .limit(50),
+        replay
+          ? Promise.resolve({ data: [] as ChatMessage[] })
+          : supabase
+              .from('chat_messages')
+              .select('*')
+              .eq('stream_id', roomStream.id)
+              .eq('is_muted', false)
+              .order('created_at', { ascending: false })
+              .limit(50),
         supabase
           .from('comments')
           .select('*')
@@ -69,6 +118,7 @@ export default async function WatchPage() {
       initialComments={initialComments}
       memberDirectory={(membersRes.data as Member[]) || []}
       isMuted={!!timeoutRes.data}
+      replay={replay}
     />
   )
 }

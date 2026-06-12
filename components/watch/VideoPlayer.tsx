@@ -12,6 +12,11 @@ interface VideoPlayerProps {
   /** When false, the player loads paused (no autoplay). Used for the admin/test
    *  account so their tab doesn't auto-play audio while testing the stream. */
   autoplay?: boolean
+  /** Play a finished broadcast's recording even though the stream is no longer
+   *  marked live (the waiting-room placeholder is skipped). */
+  replay?: boolean
+  /** Reports the current playback position while playing — drives chat replay. */
+  onTimeUpdate?: (seconds: number) => void
 }
 
 type PlayerStatus = 'loading' | 'ready' | 'offline'
@@ -19,6 +24,7 @@ type PlayerStatus = 'loading' | 'ready' | 'offline'
 interface YouTubePlayer {
   destroy?: () => void
   getPlayerState?: () => number
+  getCurrentTime?: () => number
   pauseVideo?: () => void
   playVideo?: () => void
   mute?: () => void
@@ -74,6 +80,8 @@ export default function VideoPlayer({
   videoId: selectedVideoId,
   onPlaybackError,
   autoplay = true,
+  replay = false,
+  onTimeUpdate,
 }: VideoPlayerProps) {
   const videoId = selectedVideoId?.trim() || stream?.youtube_video_id?.trim() || null
   const playerRef = useRef<YouTubePlayer | null>(null)
@@ -89,7 +97,7 @@ export default function VideoPlayer({
   const [availableQualities, setAvailableQualities] = useState<string[]>([])
   const [showQualityMenu, setShowQualityMenu] = useState(false)
 
-  const hasLiveVideo = !!stream?.is_live && !!videoId
+  const hasLiveVideo = (!!stream?.is_live || replay) && !!videoId
   const playerState = playback.videoId === videoId ? playback.playerState : 'loading'
   const isPlaying = playback.videoId === videoId ? playback.isPlaying : false
 
@@ -270,6 +278,22 @@ export default function VideoPlayer({
       }
     }
   }, [hasLiveVideo, initPlayer, videoId])
+
+  // Surface the playback position so the chat replay can stay in sync. Polling
+  // (rather than state) keeps the once-per-tick update out of React's render
+  // path — the consumer stores it in a ref.
+  useEffect(() => {
+    if (!onTimeUpdate || playerState !== 'ready') return
+
+    const interval = window.setInterval(() => {
+      const seconds = playerRef.current?.getCurrentTime?.()
+      if (typeof seconds === 'number' && Number.isFinite(seconds)) {
+        onTimeUpdate(seconds)
+      }
+    }, 500)
+
+    return () => window.clearInterval(interval)
+  }, [onTimeUpdate, playerState])
 
   if (!hasLiveVideo) {
     return (

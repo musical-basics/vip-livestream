@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase-client'
 import type { Member, Stream, ChatMessage, Comment, SetlistItem } from '@/lib/database.types'
 import VideoPlayer from './VideoPlayer'
 import ChatPanel from './ChatPanel'
+import ReplayChatPanel from './ReplayChatPanel'
 import SetlistPanel from './SetlistPanel'
 import CommentSection from './CommentSection'
 import TipButton from './TipButton'
@@ -31,6 +32,13 @@ const DEFAULT_VIDEO_HEIGHT = 360
 const STREAM_SYNC_POLL_MS = 5 * 60 * 1000
 
 // ── Types ─────────────────────────────────────────────────────
+export interface ReplayData {
+  /** Wall-clock moment the broadcast went on air — maps video time 0:00. */
+  startUtc: string
+  /** Full chat history of the stream, ascending by created_at. */
+  messages: ChatMessage[]
+}
+
 interface WatchPageClientProps {
   member: Member
   stream: Stream | null
@@ -40,6 +48,9 @@ interface WatchPageClientProps {
   isMuted: boolean
   /** Global fallback programme (stored or code default) when the stream has no own setlist. */
   programme?: SetlistItem[]
+  /** When the show is over on YouTube, the page replays the recording with the
+   *  original chat appearing in sync with the video. */
+  replay?: ReplayData | null
 }
 
 interface LeaderboardChatter {
@@ -124,9 +135,18 @@ export default function WatchPageClient({
   memberDirectory,
   isMuted,
   programme,
+  replay = null,
 }: WatchPageClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const isReplay = !!replay
+
+  // The player writes its position here every tick; the replay chat polls it.
+  // A ref keeps the once-per-500ms update from re-rendering the whole page.
+  const replayTimeRef = useRef(0)
+  const handleReplayTimeUpdate = useCallback((seconds: number) => {
+    replayTimeRef.current = seconds
+  }, [])
   const showConcertAnnouncement = searchParams.get('welcome') === '1'
   const [activeProfileMemberId, setActiveProfileMemberId] = useState<string | null>(null)
 
@@ -544,32 +564,39 @@ export default function WatchPageClient({
     }
   }, [])
 
-  // Auto-refresh and realtime updates when the active stream changes.
+  // Auto-refresh and realtime updates when the active stream changes. During a
+  // replay only a NEW stream going live matters — "ended"/"updated" events
+  // describe the already-finished show, and reloading would restart the
+  // viewer's video from 0:00.
   useEffect(() => {
     const supabase = createClient()
-    const statusChannel = supabase
-      .channel('stream-status')
-      .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
-      .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
-      .on('broadcast', { event: 'stream_updated' }, () => void syncStreamSources())
-      .subscribe()
-    const currentStreamChannel = stream?.id
-      ? supabase
-          .channel(`stream:${stream.id}`)
-          .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
-          .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
-          .on('broadcast', { event: 'stream_updated' }, () => void syncStreamSources())
-          .on('broadcast', { event: 'new_message' }, ({ payload }) => {
-            handleRealtimeMessage(payload as ChatMessage)
-          })
-          .subscribe()
-      : null
+    const statusChannel = supabase.channel('stream-status')
+    statusChannel.on('broadcast', { event: 'stream_live' }, refreshWatchPage)
+    if (!isReplay) {
+      statusChannel
+        .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
+        .on('broadcast', { event: 'stream_updated' }, () => void syncStreamSources())
+    }
+    statusChannel.subscribe()
+
+    let currentStreamChannel: ReturnType<typeof supabase.channel> | null = null
+    if (stream?.id && !isReplay) {
+      currentStreamChannel = supabase
+        .channel(`stream:${stream.id}`)
+        .on('broadcast', { event: 'stream_live' }, refreshWatchPage)
+        .on('broadcast', { event: 'stream_ended' }, refreshWatchPage)
+        .on('broadcast', { event: 'stream_updated' }, () => void syncStreamSources())
+        .on('broadcast', { event: 'new_message' }, ({ payload }) => {
+          handleRealtimeMessage(payload as ChatMessage)
+        })
+        .subscribe()
+    }
 
     return () => {
       supabase.removeChannel(statusChannel)
       if (currentStreamChannel) supabase.removeChannel(currentStreamChannel)
     }
-  }, [stream?.id, refreshWatchPage, syncStreamSources, handleRealtimeMessage])
+  }, [stream?.id, isReplay, refreshWatchPage, syncStreamSources, handleRealtimeMessage])
 
   // Realtime can be missed if a tab sleeps. Poll lightly as a safety net.
   useEffect(() => {
@@ -587,6 +614,16 @@ export default function WatchPageClient({
           youtube_video_id?: string
           backup_youtube_video_id_1?: string | null
           backup_youtube_video_id_2?: string | null
+        }
+
+        if (isReplay) {
+          // Mid-replay, only a different stream going live warrants a reload —
+          // the room stream may still read "live" in the DB until the cron
+          // notices YouTube ended it, and that flip must not restart the video.
+          if (data.is_live === true && data.stream_id !== stream?.id) {
+            refreshWatchPage()
+          }
+          return
         }
 
         const activeStreamChanged =
@@ -631,6 +668,7 @@ export default function WatchPageClient({
     stream?.youtube_video_id,
     stream?.backup_youtube_video_id_1,
     stream?.backup_youtube_video_id_2,
+    isReplay,
     refreshWatchPage,
     syncStreamSources,
   ])
@@ -728,7 +766,17 @@ export default function WatchPageClient({
     </>
   )
 
-  const chatPanel = (
+  const chatPanel = replay ? (
+    <ReplayChatPanel
+      key={stream?.id ?? 'replay'}
+      member={member}
+      messages={replay.messages}
+      memberDirectory={memberDirectory}
+      replayStartUtc={replay.startUtc}
+      currentTimeRef={replayTimeRef}
+      onEmojiReaction={addFloatingEmoji}
+    />
+  ) : (
     <ChatPanel
       key={stream?.id ?? 'waiting-room'}
       member={member}
@@ -745,10 +793,22 @@ export default function WatchPageClient({
     />
   )
 
+  const chatTitle = isReplay ? 'Chat Replay' : 'Live Chat'
+  const chatBadge = isReplay ? (
+    <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-[oklch(0.75_0.12_85)]/15 text-[oklch(0.75_0.12_85)] font-medium">
+      REPLAY
+    </span>
+  ) : stream?.is_live ? (
+    <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium flex items-center gap-1">
+      <span className="w-1.5 h-1.5 rounded-full bg-red-400 live-pulse inline-block" />
+      LIVE
+    </span>
+  ) : null
+
     return (
       <div className="flex h-[100dvh] flex-col overflow-hidden">
         <Header member={member} stream={stream} />
-      {stream && (
+      {stream && !isReplay && (
         <div className="border-b border-border/30 bg-black/75 px-3 py-2 backdrop-blur sm:px-4">
           <div
             role="tablist"
@@ -898,6 +958,8 @@ export default function WatchPageClient({
                 videoId={selectedSource?.videoId}
                 onPlaybackError={handlePlaybackError}
                 autoplay={!member.is_admin}
+                replay={isReplay}
+                onTimeUpdate={isReplay ? handleReplayTimeUpdate : undefined}
               />
               <EmojiOverlay emojis={floatingEmojis} />
             </div>
@@ -917,13 +979,8 @@ export default function WatchPageClient({
           >
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 glass-heavy">
               <MessageSquare className="w-4 h-4 text-[oklch(0.75_0.12_85)]" />
-              <span className="text-sm font-medium">Live Chat</span>
-              {stream?.is_live && (
-                <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 live-pulse inline-block" />
-                  LIVE
-                </span>
-              )}
+              <span className="text-sm font-medium">{chatTitle}</span>
+              {chatBadge}
             </div>
             {chatPanel}
           </div>
@@ -938,6 +995,8 @@ export default function WatchPageClient({
               videoId={selectedSource?.videoId}
               onPlaybackError={handlePlaybackError}
               autoplay={!member.is_admin}
+              replay={isReplay}
+              onTimeUpdate={isReplay ? handleReplayTimeUpdate : undefined}
             />
             <EmojiOverlay emojis={floatingEmojis} />
           </div>
@@ -955,8 +1014,8 @@ export default function WatchPageClient({
               className="absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[oklch(0.75_0.12_85)] px-5 py-2.5 text-sm font-semibold text-[oklch(0.09_0.015_270)] shadow-xl shadow-black/40 transition-transform active:scale-95"
             >
               <MessageSquare className="w-4 h-4" />
-              Live chat
-              {stream?.is_live && (
+              {isReplay ? 'Chat replay' : 'Live chat'}
+              {!isReplay && stream?.is_live && (
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 live-pulse inline-block" />
               )}
             </button>
@@ -972,13 +1031,17 @@ export default function WatchPageClient({
           >
             <div className="flex flex-shrink-0 items-center gap-2 border-b border-border/50 px-4 py-3">
               <MessageSquare className="w-4 h-4 text-[oklch(0.75_0.12_85)]" />
-              <span className="text-sm font-medium">Live Chat</span>
-              {stream?.is_live && (
+              <span className="text-sm font-medium">{chatTitle}</span>
+              {isReplay ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[oklch(0.75_0.12_85)]/15 text-[oklch(0.75_0.12_85)] font-medium">
+                  REPLAY
+                </span>
+              ) : stream?.is_live ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-400 live-pulse inline-block" />
                   LIVE
                 </span>
-              )}
+              ) : null}
               <button
                 type="button"
                 onClick={() => setMobileChatOpen(false)}

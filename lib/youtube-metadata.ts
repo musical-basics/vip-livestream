@@ -15,6 +15,9 @@ export interface YouTubeVideoMetadata {
   broadcastStatus: YouTubeBroadcastStatus
   durationSeconds: number | null
   title: string | null
+  /** When the broadcast actually went on air (ISO 8601). Video time 0:00 of a
+   *  finished live stream's replay corresponds to this wall-clock moment. */
+  actualStartTime: string | null
 }
 
 function asRecord(value: unknown) {
@@ -168,7 +171,7 @@ export async function fetchYouTubeVideoMetadata(
     clearTimeout(timeoutId)
 
     if (!res.ok) {
-      return { broadcastStatus: 'unknown', durationSeconds: null, title: null }
+      return { broadcastStatus: 'unknown', durationSeconds: null, title: null, actualStartTime: null }
     }
 
     const html = await res.text()
@@ -191,8 +194,10 @@ export async function fetchYouTubeVideoMetadata(
       ),
       durationSeconds,
       title: getString(videoDetails, 'title'),
+      actualStartTime:
+        getString(liveBroadcastDetails, 'startTimestamp') ?? getHtmlString(html, 'startTimestamp'),
     }
   } catch {
-    return { broadcastStatus: 'unknown', durationSeconds: null, title: null }
+    return { broadcastStatus: 'unknown', durationSeconds: null, title: null, actualStartTime: null }
   }
 }
