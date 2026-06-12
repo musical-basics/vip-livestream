@@ -64,7 +64,19 @@ export default async function WatchPage() {
   const mainVideoId = roomStream?.youtube_video_id?.trim()
   if (roomStream && mainVideoId) {
     const metadata = await fetchYouTubeVideoMetadata(mainVideoId, { revalidate: 300 })
-    if (metadata.broadcastStatus === 'ended') {
+    // Fallback when YouTube is unreachable from the server: a stream that went
+    // live in the past (stream_start_utc is stamped at go-live) and has since
+    // been marked ended in the DB is a finished show, so replay it.
+    const streamStartMs = roomStream.stream_start_utc
+      ? Date.parse(roomStream.stream_start_utc)
+      : Number.NaN
+    const endedPerDb =
+      !roomStream.is_live &&
+      Number.isFinite(streamStartMs) &&
+      streamStartMs < new Date().getTime() &&
+      metadata.broadcastStatus !== 'live'
+
+    if (metadata.broadcastStatus === 'ended' || endedPerDb) {
       replay = {
         startUtc:
           metadata.actualStartTime ?? roomStream.stream_start_utc ?? roomStream.created_at,

@@ -145,9 +145,41 @@ function getBroadcastStatus(
   return 'unknown'
 }
 
-export async function fetchYouTubeVideoMetadata(
+const UNKNOWN_METADATA: YouTubeVideoMetadata = {
+  broadcastStatus: 'unknown',
+  durationSeconds: null,
+  title: null,
+  actualStartTime: null,
+}
+
+function buildMetadata(playerResponse: Record<string, unknown> | null, html: string): YouTubeVideoMetadata {
+  const videoDetails = getRecord(playerResponse, 'videoDetails')
+  const microformat = getRecord(playerResponse, 'microformat')
+  const playerMicroformat = getRecord(microformat, 'playerMicroformatRenderer')
+  const liveBroadcastDetails = getRecord(playerMicroformat, 'liveBroadcastDetails')
+  const playability = getRecord(playerResponse, 'playabilityStatus')
+  const playabilityStatus = getString(playability, 'status')
+  const durationSeconds = getDurationSeconds(html, videoDetails)
+
+  return {
+    broadcastStatus: getBroadcastStatus(
+      videoDetails,
+      liveBroadcastDetails,
+      playabilityStatus,
+      durationSeconds,
+      html
+    ),
+    durationSeconds,
+    title: getString(videoDetails, 'title'),
+    actualStartTime:
+      getString(liveBroadcastDetails, 'startTimestamp') ??
+      (html ? getHtmlString(html, 'startTimestamp') : null),
+  }
+}
+
+async function fetchViaWatchPage(
   videoId: string,
-  options: YouTubeMetadataOptions = {}
+  options: YouTubeMetadataOptions
 ): Promise<YouTubeVideoMetadata> {
   try {
     const controller = new AbortController()
@@ -171,33 +203,58 @@ export async function fetchYouTubeVideoMetadata(
     clearTimeout(timeoutId)
 
     if (!res.ok) {
-      return { broadcastStatus: 'unknown', durationSeconds: null, title: null, actualStartTime: null }
+      return UNKNOWN_METADATA
     }
 
     const html = await res.text()
-    const playerResponse = parsePlayerResponse(html)
-    const videoDetails = getRecord(playerResponse, 'videoDetails')
-    const microformat = getRecord(playerResponse, 'microformat')
-    const playerMicroformat = getRecord(microformat, 'playerMicroformatRenderer')
-    const liveBroadcastDetails = getRecord(playerMicroformat, 'liveBroadcastDetails')
-    const playability = getRecord(playerResponse, 'playabilityStatus')
-    const playabilityStatus = getString(playability, 'status')
-    const durationSeconds = getDurationSeconds(html, videoDetails)
-
-    return {
-      broadcastStatus: getBroadcastStatus(
-        videoDetails,
-        liveBroadcastDetails,
-        playabilityStatus,
-        durationSeconds,
-        html
-      ),
-      durationSeconds,
-      title: getString(videoDetails, 'title'),
-      actualStartTime:
-        getString(liveBroadcastDetails, 'startTimestamp') ?? getHtmlString(html, 'startTimestamp'),
-    }
+    return buildMetadata(parsePlayerResponse(html), html)
   } catch {
-    return { broadcastStatus: 'unknown', durationSeconds: null, title: null, actualStartTime: null }
+    return UNKNOWN_METADATA
   }
+}
+
+/**
+ * The InnerTube player endpoint is the JSON API YouTube's own web client
+ * calls. Unlike the watch-page HTML (which datacenter IPs — e.g. Vercel —
+ * often get bot-walled on, hiding the player response), it reliably returns
+ * broadcast details, so it backs up the scrape when that yields 'unknown'.
+ */
+async function fetchViaInnerTube(videoId: string): Promise<YouTubeVideoMetadata> {
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000)
+
+    const res = await fetch('https://www.youtube.com/youtubei/v1/player', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        context: { client: { clientName: 'WEB', clientVersion: '2.20250101.00.00' } },
+        videoId,
+      }),
+      cache: 'no-store',
+    })
+    clearTimeout(timeoutId)
+
+    if (!res.ok) {
+      return UNKNOWN_METADATA
+    }
+
+    return buildMetadata(asRecord(await res.json()), '')
+  } catch {
+    return UNKNOWN_METADATA
+  }
+}
+
+export async function fetchYouTubeVideoMetadata(
+  videoId: string,
+  options: YouTubeMetadataOptions = {}
+): Promise<YouTubeVideoMetadata> {
+  const fromWatchPage = await fetchViaWatchPage(videoId, options)
+  if (fromWatchPage.broadcastStatus !== 'unknown') {
+    return fromWatchPage
+  }
+
+  const fromInnerTube = await fetchViaInnerTube(videoId)
+  return fromInnerTube.broadcastStatus !== 'unknown' ? fromInnerTube : fromWatchPage
 }
